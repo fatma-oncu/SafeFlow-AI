@@ -37,7 +37,7 @@ Employee aggregate root, EmploymentInfo, EmergencyContact value object'leri.
 7. `Employee` aggregate root (ITenantEntity, DepartmentId, LocationId)
 8. Domain metotlar: Hire, Terminate, Transfer, UpdatePosition, AddDocument
 9. State machine: Active ↔ OnLeave ↔ Suspended → Terminated
-10. Domain events: EmployeeHired, EmployeeTerminated, EmployeeTransferred
+10. Domain events: EmployeeHiredDomainEvent, EmployeeTerminatedDomainEvent, EmployeeTransferredDomainEvent
 11. Unit test'ler
 
 ### Oluşturulacak Sınıflar
@@ -49,9 +49,9 @@ SafeFlow.Domain.Employees.ValueObjects.EmergencyContact
 SafeFlow.Domain.Employees.Enums.EmploymentType
 SafeFlow.Domain.Employees.Enums.EmployeeStatus
 SafeFlow.Domain.Employees.Enums.DocumentType
-SafeFlow.Domain.Employees.Events.EmployeeHired
-SafeFlow.Domain.Employees.Events.EmployeeTerminated
-SafeFlow.Domain.Employees.Events.EmployeeTransferred
+SafeFlow.Domain.Employees.Events.EmployeeHiredDomainEvent
+SafeFlow.Domain.Employees.Events.EmployeeTerminatedDomainEvent
+SafeFlow.Domain.Employees.Events.EmployeeTransferredDomainEvent
 ```
 
 ### Oluşturulacak Dosyalar
@@ -63,9 +63,9 @@ src/SafeFlow.Domain/Employees/ValueObjects/EmergencyContact.cs
 src/SafeFlow.Domain/Employees/Enums/EmploymentType.cs
 src/SafeFlow.Domain/Employees/Enums/EmployeeStatus.cs
 src/SafeFlow.Domain/Employees/Enums/DocumentType.cs
-src/SafeFlow.Domain/Employees/Events/EmployeeHired.cs
-src/SafeFlow.Domain/Employees/Events/EmployeeTerminated.cs
-src/SafeFlow.Domain/Employees/Events/EmployeeTransferred.cs
+src/SafeFlow.Domain/Employees/Events/EmployeeHiredDomainEvent.cs
+src/SafeFlow.Domain/Employees/Events/EmployeeTerminatedDomainEvent.cs
+src/SafeFlow.Domain/Employees/Events/EmployeeTransferredDomainEvent.cs
 tests/SafeFlow.Domain.Tests/Employees/EmployeeTests.cs
 tests/SafeFlow.Domain.Tests/Employees/EmployeeStateTests.cs
 ```
@@ -187,8 +187,8 @@ feat(infrastructure): add IEmployeeRepository with domain-specific queries
 - EmergencyContact: Name ve Phone zorunlu
 
 ### Domain Event
-- `EmployeeHired` — Yeni çalışan oluşturulduğunda
-- `EmployeeTransferred` — Transfer işleminde
+- `EmployeeHiredDomainEvent` — Yeni çalışan oluşturulduğunda
+- `EmployeeTransferredDomainEvent` — Transfer işleminde
 
 ### Log Kayıtları
 - `[INFO] Employee created: {EmployeeId} in department {DeptId}`
@@ -229,7 +229,7 @@ feat(api): add Employee CRUD endpoints with TC validation and transfer support
 ### Yapılacak Teknik İşler
 1. `EmployeeSearchCriteria` sınıfı (search, departmentId, locationId, status, employmentType)
 2. Repository search metodu güncelleme (dynamic LINQ)
-3. Full-text search hazırlığı (PostgreSQL tsvector — opsiyonel)
+3. Full-text search hazırlığı (SQL Server Full-Text Search — opsiyonel)
 4. Sonuçlarda eğitim ve sertifika özet bilgisi
 
 ### Bağımlı Olduğu Görevler

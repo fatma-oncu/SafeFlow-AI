@@ -16,6 +16,12 @@
 | **Feature** | Tenant Domain Model |
 | **User Story** | Platform yöneticisi olarak, her şirketin kendi izole veri alanında çalışmasını istiyorum ki müşteri verilerinin birbirine karışması engellensin. |
 
+> [!IMPORTANT]
+> **MVP Kararı: 1 Tenant = 1 Company.** MVP'de ayrı bir `Tenant` entity oluşturulmaz.
+> `Company` aggregate root aynı zamanda tenant görevi görür. `Company.Id` = `TenantId`.
+> `SubscriptionPlan` Company üzerine taşınmıştır. Gelecekte OSGB modeli (1 Tenant = N Company)
+> gerekirse ayrı Tenant entity oluşturulacaktır.
+
 ### Neden Yapılıyor?
 SaaS platformda veri izolasyonu kritiktir. Her müşteri (tenant) yalnızca kendi verilerini görmeli ve yönetmelidir.
 
@@ -25,46 +31,53 @@ SaaS platformda veri izolasyonu kritiktir. Her müşteri (tenant) yalnızca kend
 - Müşteri bazlı özelleştirme altyapısı
 
 ### Teknik Amaç
-Tenant entity, TenantSettings value object ve tenant resolution mekanizması.
+Multi-tenant veri izolasyonu için EF Core Global Query Filter mekanizması, tenant resolution ve Company aggregate üzerine SubscriptionPlan entegrasyonu.
 
 ### Yapılacak Teknik İşler
-1. `Tenant` entity oluştur (Id, Name, Subdomain, Settings, IsActive, CreatedAt)
-2. `TenantSettings` value object (MaxUsers, MaxEmployees, Features)
-3. `SubscriptionPlan` value object (Type, StartDate, EndDate, IsActive)
-4. `PlanType` enumeration (Free, Starter, Professional, Enterprise)
-5. Tenant domain metotları: Activate, Deactivate, UpdateSettings, ChangePlan
-6. Domain event: TenantCreated, TenantSettingsUpdated
-7. Unit test'ler
+1. `ITenantEntity` interface'ine `TenantId` (Guid) property ekle (Shared Kernel'da)
+2. `ITenantService` interface oluştur (current tenant resolution)
+3. `CurrentTenantService` implementation (JWT claim'den TenantId okur)
+4. EF Core Global Query Filter ile `TenantId` filtreleme (tüm ITenantEntity sorgularında)
+5. SaveChanges interceptor ile otomatik `TenantId` atama
+6. Company aggregate'e `SubscriptionPlan` value object ekle (MaxUsers, MaxEmployees, PlanType)
+7. `PlanType` enumeration (Free, Starter, Professional, Enterprise)
+8. Tenant resolution middleware (JWT → TenantId → HttpContext)
+9. Domain event'ler: TenantSettingsUpdatedDomainEvent
+10. Unit test'ler (izolasyon, filter, resolution)
 
 ### Oluşturulacak Sınıflar
 ```csharp
-SafeFlow.Domain.Tenants.Entities.Tenant
-SafeFlow.Domain.Tenants.ValueObjects.TenantSettings
-SafeFlow.Domain.Tenants.ValueObjects.SubscriptionPlan
-SafeFlow.Domain.Tenants.Enums.PlanType
-SafeFlow.Domain.Tenants.Events.TenantCreated
-SafeFlow.Domain.Tenants.Events.TenantSettingsUpdated
+SafeFlow.Domain.Common.Interfaces.ITenantEntity
+SafeFlow.Domain.Common.Interfaces.ITenantService
+SafeFlow.Domain.Companies.ValueObjects.SubscriptionPlan
+SafeFlow.Domain.Companies.Enums.PlanType
+SafeFlow.Domain.Companies.Events.TenantSettingsUpdatedDomainEvent
+SafeFlow.Infrastructure.MultiTenant.CurrentTenantService
+SafeFlow.Infrastructure.MultiTenant.TenantQueryFilter
 ```
 
 ### Oluşturulacak Dosyalar
 ```
-src/SafeFlow.Domain/Tenants/Entities/Tenant.cs
-src/SafeFlow.Domain/Tenants/ValueObjects/TenantSettings.cs
-src/SafeFlow.Domain/Tenants/ValueObjects/SubscriptionPlan.cs
-src/SafeFlow.Domain/Tenants/Enums/PlanType.cs
-src/SafeFlow.Domain/Tenants/Events/TenantCreated.cs
-src/SafeFlow.Domain/Tenants/Events/TenantSettingsUpdated.cs
-tests/SafeFlow.Domain.Tests/Tenants/TenantTests.cs
+src/SafeFlow.Domain/Common/Interfaces/ITenantEntity.cs
+src/SafeFlow.Domain/Common/Interfaces/ITenantService.cs
+src/SafeFlow.Domain/Companies/ValueObjects/SubscriptionPlan.cs
+src/SafeFlow.Domain/Companies/Enums/PlanType.cs
+src/SafeFlow.Domain/Companies/Events/TenantSettingsUpdatedDomainEvent.cs
+src/SafeFlow.Infrastructure/MultiTenant/CurrentTenantService.cs
+src/SafeFlow.Infrastructure/MultiTenant/TenantQueryFilter.cs
+tests/SafeFlow.Infrastructure.Tests/MultiTenant/TenantQueryFilterTests.cs
 ```
 
 ### Bağımlı Olduğu Görevler
 - TASK 0.2 (Domain base classes)
 
 ### Acceptance Criteria
-- [ ] Tenant oluşturulabiliyor
-- [ ] SubscriptionPlan süre ve limit kontrolü yapabiliyor
-- [ ] TenantSettings MaxUsers limiti tanımlayabiliyor
-- [ ] TenantCreated event dispatch ediliyor
+- [ ] ITenantEntity interface tanımlı ve Company tarafından implement ediliyor
+- [ ] EF Core Global Query Filter aktif — farklı tenantlar birbirinin verisini göremiyor
+- [ ] JWT claim'den TenantId doğru çözülüyor
+- [ ] SaveChanges interceptor yeni kayıtlara TenantId otomatik atanıyor
+- [ ] SubscriptionPlan Company üzerine entegre ve MaxUsers limiti çalışıyor
+- [ ] TenantSettingsUpdatedDomainEvent dispatch ediliyor
 - [ ] Unit test'ler geçiyor
 
 ### Tahmini Süre
@@ -72,11 +85,11 @@ tests/SafeFlow.Domain.Tests/Tenants/TenantTests.cs
 
 ### Önerilen Git Commit Mesajı
 ```
-feat(domain): add Tenant entity with subscription and settings
+feat(domain): add multi-tenant filter and subscription plan on Company
 
-- Implement Tenant entity with subscription management
-- Add TenantSettings and SubscriptionPlan value objects
-- Add TenantCreated domain event
+- Implement SubscriptionPlan value object
+- Add PlanType enumeration
+- Add TenantSettingsUpdatedDomainEvent
 ```
 
 ---

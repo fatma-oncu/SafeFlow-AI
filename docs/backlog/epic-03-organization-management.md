@@ -36,7 +36,7 @@ Company aggregate root, Department entity, Location entity ve ilgili value objec
 6. `Location` entity (Name, Address, LocationType, IsActive)
 7. `LocationType` enumeration (HeadOffice, Factory, Warehouse, FieldOffice)
 8. Domain metotlar: AddDepartment, RemoveDepartment, AddLocation, UpdateInfo
-9. Domain events: DepartmentCreated, LocationCreated
+9. Domain events: DepartmentCreatedDomainEvent, LocationCreatedDomainEvent
 10. Unit test'ler
 
 ### Oluşturulacak Sınıflar
@@ -49,8 +49,8 @@ SafeFlow.Domain.Companies.ValueObjects.Address
 SafeFlow.Domain.Companies.ValueObjects.TaxInfo
 SafeFlow.Domain.Companies.Enums.LocationType
 SafeFlow.Domain.Companies.Enums.CompanyStatus
-SafeFlow.Domain.Companies.Events.DepartmentCreated
-SafeFlow.Domain.Companies.Events.LocationCreated
+SafeFlow.Domain.Companies.Events.DepartmentCreatedDomainEvent
+SafeFlow.Domain.Companies.Events.LocationCreatedDomainEvent
 ```
 
 ### Oluşturulacak Dosyalar
@@ -63,8 +63,8 @@ src/SafeFlow.Domain/Companies/ValueObjects/Address.cs
 src/SafeFlow.Domain/Companies/ValueObjects/TaxInfo.cs
 src/SafeFlow.Domain/Companies/Enums/LocationType.cs
 src/SafeFlow.Domain/Companies/Enums/CompanyStatus.cs
-src/SafeFlow.Domain/Companies/Events/DepartmentCreated.cs
-src/SafeFlow.Domain/Companies/Events/LocationCreated.cs
+src/SafeFlow.Domain/Companies/Events/DepartmentCreatedDomainEvent.cs
+src/SafeFlow.Domain/Companies/Events/LocationCreatedDomainEvent.cs
 tests/SafeFlow.Domain.Tests/Companies/CompanyTests.cs
 tests/SafeFlow.Domain.Tests/Companies/DepartmentTests.cs
 ```

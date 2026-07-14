@@ -43,8 +43,8 @@ Dashboard, platformun "vitrinidir". Yönetici ilk açtığında organizasyonun �
 - TASK 7.4 (Certificate endpoints — veri)
 
 ### Performans Notları
-- Aggregate query'ler PostgreSQL materialized view ile optimize edilebilir (gelecek)
-- Cache invalidation: TrainingCompleted, CertificateIssued event'lerinde
+- Aggregate query'ler SQL Server Indexed Views ile optimize edilebilir (gelecek)
+- Cache invalidation: TrainingCompletedDomainEvent, CertificateIssuedDomainEvent event'lerinde
 
 ### Tahmini Süre
 **1 gün**

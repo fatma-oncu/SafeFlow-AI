@@ -2,7 +2,7 @@
 
 > **Versiyon:** 1.1  
 > **Tarih:** 2026-07-07  
-> **Durum:** Taslak — Onay Bekliyor
+> **Durum:** ✅ Onaylandı
 
 > [!IMPORTANT]
 > **SafeFlow-AI**, yalnızca bir İSG yazılımı değildir. İş Sağlığı ve Güvenliği süreçlerini
@@ -23,6 +23,7 @@ C4Context
     Person(isg_uzmani, "İSG Uzmanı", "Eğitim planlar, risk değerlendirmesi yapar, denetim yönetir")
     Person(isveren, "İşveren / Yönetici", "Dashboard izler, raporları inceler, onay verir")
     Person(calisan, "Çalışan", "Eğitimlere katılır, bildirim alır, sertifikalarını görüntüler")
+    Person(isyeri_hekimi, "İşyeri Hekimi", "Çalışan sağlık gözetimlerini, muayeneleri yönetir ve takip eder")
     Person(sistem_admin, "Sistem Yöneticisi", "Tenant yönetimi, kullanıcı yönetimi, sistem konfigürasyonu")
 
     System(safeflow, "SafeFlow-AI Platform", "İSG süreçlerini dijitalleştiren, otomatikleştiren ve AI ile karar desteği sağlayan modüler operasyon platformu. Eğitim, risk değerlendirme, saha denetimi, KKD yönetimi, olay yönetimi ve mevzuat uyumluluğunu tek çatı altında birleştirir.")
@@ -36,6 +37,7 @@ C4Context
     Rel(isg_uzmani, safeflow, "Eğitim planlar, risk değerlendirir, denetim yapar", "HTTPS")
     Rel(isveren, safeflow, "Dashboard izler, raporları inceler", "HTTPS")
     Rel(calisan, safeflow, "Eğitime katılır, sertifika görüntüler", "HTTPS")
+    Rel(isyeri_hekimi, safeflow, "Sağlık gözetimlerini, muayeneleri kaydeder", "HTTPS")
     Rel(sistem_admin, safeflow, "Sistem yapılandırır, tenant yönetir", "HTTPS")
 
     Rel(safeflow, email_service, "Bildirim e-postaları gönderir", "SMTP/API")
@@ -50,6 +52,7 @@ C4Context
 | Persona | Rol | Temel Eylemler | Erişim |
 |---------|-----|----------------|--------|
 | **İSG Uzmanı** | Operasyonel kullanıcı | Eğitim planlama, risk değerlendirme, denetim, DÖF, iş kazası kaydı | Web + Mobil |
+| **İşyeri Hekimi** | Operasyonel kullanıcı | Çalışan sağlık gözetimleri, işe giriş ve periyodik muayene kayıtları, sevk ve aşı takibi | Web + Mobil |
 | **İşveren / Yönetici** | Karar verici | Dashboard, raporlar, onay süreçleri, trend analizi | Web |
 | **Çalışan** | Son kullanıcı | Eğitime katılım, sertifika görüntüleme, bildirim alma | Mobil (öncelikli) |
 | **Sistem Yöneticisi** | Teknik yönetici | Tenant yönetimi, kullanıcı yönetimi, sistem konfigürasyonu | Web |
@@ -69,11 +72,11 @@ C4Container
     System_Boundary(safeflow_boundary, "SafeFlow-AI Platform") {
         Container(mobile_app, "Flutter Mobil Uygulama", "Flutter / Dart", "Offline-first mobil uygulama. SQLite ile local veri, sync servisi ile senkronizasyon")
         Container(web_app, "Flutter Web Uygulama", "Flutter / Dart", "Responsive web arayüzü. Dashboard, raporlama ve yönetim paneli")
-        Container(api_gateway, "API Gateway", ".NET 8 / YARP", "Rate limiting, authentication, request routing, correlation ID")
-        Container(backend_api, "SafeFlow API", ".NET 8 / Clean Architecture", "Modüler operasyon platformu. İSG domain servisleri, CQRS + MediatR, Rule Engine hazırlığı")
-        Container(database, "PostgreSQL", "PostgreSQL 16", "Ana veritabanı. Multi-tenant veri, audit log, tüm domain verileri")
+        Container(api_gateway, "API Gateway", ".NET 9 / YARP", "Rate limiting, authentication, request routing, correlation ID")
+        Container(backend_api, "SafeFlow API", ".NET 9 / Clean Architecture", "Modüler operasyon platformu. İSG domain servisleri, CQRS + MediatR, Rule Engine hazırlığı")
+        Container(database, "SQL Server", "SQL Server 2022", "Ana veritabanı. Multi-tenant veri, audit log, tüm domain verileri")
         Container(cache, "Cache Layer", "IMemoryCache → Redis", "Sık erişilen verilerin cache'lenmesi. Session, lookup data, dashboard")
-        Container(background_jobs, "Background Jobs", ".NET 8 / Hangfire", "Zamanlanmış görevler: sertifika hatırlatma, rapor üretimi, sync")
+        Container(background_jobs, "Background Jobs", ".NET 9 / Hangfire", "Zamanlanmış görevler: sertifika hatırlatma, rapor üretimi, sync")
     }
 
     System_Ext(ai_service, "AI Servis", "FastAPI / Python. Risk önerileri, YOLO KKD tespiti, model versiyonlama")
@@ -102,9 +105,9 @@ C4Container
 |-----------|-----------|------------|------------|
 | **Flutter Mobil App** | Flutter 3.x / Dart | Offline-first mobil deneyim, SQLite local DB, sync servisi | ✅ MVP |
 | **Flutter Web App** | Flutter 3.x / Dart | Responsive web arayüzü, dashboard, yönetim paneli | ✅ MVP |
-| **API Gateway** | .NET 8 / YARP | Rate limiting, auth, routing, correlation ID, request tracing | ✅ MVP (basit) |
-| **SafeFlow API** | .NET 8 / Clean Architecture | Tüm iş mantığı, CQRS, MediatR, domain servisleri | ✅ MVP |
-| **PostgreSQL** | PostgreSQL 16 | Multi-tenant veritabanı, Row Level Security | ✅ MVP |
+| **API Gateway** | .NET 9 / YARP | Rate limiting, auth, routing, correlation ID, request tracing | ✅ MVP (basit) |
+| **SafeFlow API** | .NET 9 / Clean Architecture | Tüm iş mantığı, CQRS, MediatR, domain servisleri | ✅ MVP |
+| **SQL Server** | SQL Server 2022 | Multi-tenant veritabanı, EF Core Global Query Filter | ✅ MVP |
 | **Cache Layer** | IMemoryCache → Redis | Performans optimizasyonu | ✅ MVP (Memory) |
 | **Background Jobs** | Hangfire | Zamanlanmış görevler, hatırlatmalar | ✅ MVP (temel) |
 | **AI Servis** | FastAPI / Python | Risk önerileri, YOLO KKD tespiti | ⏳ Phase 2 |
@@ -133,14 +136,15 @@ Backend API'nin iç bileşenlerini detaylı olarak gösterir.
 C4Component
     title SafeFlow API — Component Diagram
 
-    Container_Boundary(api_boundary, "SafeFlow API (.NET 8)") {
+    Container_Boundary(api_boundary, "SafeFlow API (.NET 9)") {
 
         Component(auth_module, "Authentication Module", "JWT + Refresh Token", "Kimlik doğrulama, token üretimi, token rotation, permission-based yetkilendirme")
         Component(user_module, "User Management", "CQRS + MediatR", "Kullanıcı CRUD, rol atama, profil yönetimi")
         Component(tenant_module, "Tenant Management", "Multi-Tenant", "Şirket/tenant oluşturma, tenant isolation, ayarlar")
         Component(training_module, "Training Module", "CQRS + MediatR", "Eğitim planlama, oturum yönetimi, katılım takibi, materyal yönetimi")
         Component(cert_module, "Certificate Module", "CQRS + MediatR", "Sertifika üretimi, şablon yönetimi, geçerlilik takibi, yenileme hatırlatma")
-        Component(company_module, "Company Module", "CQRS + MediatR", "Departman, lokasyon, çalışan yönetimi")
+        Component(company_module, "Company Module", "CQRS + MediatR", "Departman, lokasyon yönetimi")
+        Component(employee_module, "Employee Module", "CQRS + MediatR", "Çalışan CRUD, departman atama, transfer, çalışan doküman yönetimi")
         Component(dashboard_module, "Dashboard Module", "Query Only", "Widget tabanlı dashboard, trend analizi, departman istatistikleri, AI önerileri")
         Component(report_module, "Report Module", "QuestPDF + ClosedXML", "PDF, Excel, CSV rapor üretimi, şablon tabanlı")
         Component(notification_module, "Notification Module", "MediatR Events", "E-posta, push notification, in-app bildirim")
@@ -152,7 +156,7 @@ C4Component
         Component(rule_engine, "Rule Engine Interface", "IRuleEngine", "İş kuralları soyutlaması, gelecekte configurable rules")
     }
 
-    ContainerDb(database, "PostgreSQL", "Ana veritabanı")
+    ContainerDb(database, "SQL Server", "Ana veritabanı")
     Container(cache, "Cache", "IMemoryCache / Redis")
     System_Ext(ai_service, "AI Service", "FastAPI")
     System_Ext(email, "Email Service", "SendGrid")
@@ -164,6 +168,7 @@ C4Component
     Rel(training_module, database, "Eğitim verileri")
     Rel(cert_module, database, "Sertifika verileri")
     Rel(company_module, database, "Şirket verileri")
+    Rel(employee_module, database, "Çalışan verileri")
     Rel(dashboard_module, database, "İstatistik sorguları")
     Rel(dashboard_module, cache, "Cache'lenmiş dashboard verileri")
     Rel(report_module, database, "Rapor verileri")
@@ -180,16 +185,17 @@ C4Component
 
 | Modül | Katman | Pattern | Domain Events | MVP |
 |-------|--------|---------|---------------|-----|
-| **Authentication** | Infrastructure | JWT + Refresh Token | `UserLoggedIn`, `TokenRefreshed` | ✅ |
-| **User Management** | Application + Domain | CQRS | `UserCreated`, `UserUpdated`, `RoleAssigned` | ✅ |
-| **Tenant Management** | Application + Domain | CQRS | `TenantCreated`, `TenantSettingsUpdated` | ✅ |
-| **Training** | Application + Domain | CQRS + State Machine | `TrainingCreated`, `TrainingScheduled`, `TrainingCompleted`, `ParticipantEnrolled` | ✅ |
-| **Certificate** | Application + Domain | CQRS + State Machine | `CertificateIssued`, `CertificateExpiring`, `CertificateRevoked` | ✅ |
-| **Company** | Application + Domain | CQRS | `DepartmentCreated`, `EmployeeAssigned` | ✅ |
+| **Authentication** | Infrastructure | JWT + Refresh Token | `UserLoggedInDomainEvent`, `TokenRefreshedDomainEvent` | ✅ |
+| **User Management** | Application + Domain | CQRS | `UserRegisteredDomainEvent`, `UserActivatedDomainEvent`, `RoleAssignedDomainEvent` | ✅ |
+| **Tenant Management** | Application + Domain | CQRS | `TenantCreatedDomainEvent`, `TenantSettingsUpdatedDomainEvent` | ✅ |
+| **Training** | Application + Domain | CQRS + State Machine | `TrainingCreatedDomainEvent`, `TrainingScheduledDomainEvent`, `TrainingCompletedDomainEvent`, `ParticipantEnrolledDomainEvent` | ✅ |
+| **Certificate** | Application + Domain | CQRS + State Machine | `CertificateIssuedDomainEvent`, `CertificateExpiringDomainEvent`, `CertificateRevokedDomainEvent` | ✅ |
+| **Company** | Application + Domain | CQRS | `DepartmentCreatedDomainEvent`, `LocationCreatedDomainEvent` | ✅ |
+| **Employee** | Application + Domain | CQRS | `EmployeeHiredDomainEvent`, `EmployeeTransferredDomainEvent`, `EmployeeTerminatedDomainEvent` | ✅ |
 | **Dashboard** | Application (Query) | Read Model | — | ✅ |
-| **Report** | Application | Template Pattern | `ReportGenerated` | ✅ |
+| **Report** | Application | Template Pattern | `ReportGeneratedDomainEvent` | ✅ |
 | **Notification** | Infrastructure | Event Handler | — | ✅ |
-| **Sync** | Application | Delta Sync | `SyncCompleted`, `ConflictDetected` | ✅ |
+| **Sync** | Application | Delta Sync | `SyncCompletedDomainEvent`, `ConflictDetectedDomainEvent` | ✅ |
 | **Health** | Infrastructure | Health Check | — | ✅ |
 
 ---
@@ -213,7 +219,7 @@ C4Component
         Component(offline_queue, "Offline Queue", "SQLite", "Pending CRUD operations, priority queue, retry metadata")
     }
 
-    System_Ext(backend, "SafeFlow API", ".NET 8 Backend")
+    System_Ext(backend, "SafeFlow API", ".NET 9 Backend")
     System_Ext(push_service, "Push Service", "Firebase Cloud Messaging")
 
     Rel(ui_layer, state_mgmt, "State okur/günceller")
@@ -245,9 +251,9 @@ graph TB
     end
 
     subgraph "Application Tier"
-        API1["🖥️ SafeFlow API<br/>Instance 1<br/>.NET 8"]
-        API2["🖥️ SafeFlow API<br/>Instance 2<br/>.NET 8"]
-        BG["⏰ Background Jobs<br/>Hangfire Server<br/>.NET 8"]
+        API1["🖥️ SafeFlow API<br/>Instance 1<br/>.NET 9"]
+        API2["🖥️ SafeFlow API<br/>Instance 2<br/>.NET 9"]
+        BG["⏰ Background Jobs<br/>Hangfire Server<br/>.NET 9"]
     end
 
     subgraph "AI Tier"
@@ -255,8 +261,8 @@ graph TB
     end
 
     subgraph "Data Tier"
-        PG_PRIMARY["🐘 PostgreSQL<br/>Primary<br/>Read/Write"]
-        PG_REPLICA["🐘 PostgreSQL<br/>Replica<br/>Read Only"]
+        SQL_PRIMARY["🗄️ SQL Server 2022<br/>Primary<br/>Read/Write"]
+        SQL_REPLICA["🗄️ SQL Server 2022<br/>Replica<br/>Read Only"]
         REDIS["💾 Redis<br/>Cache + Session<br/>(Production)"]
         BLOB["📦 Blob Storage<br/>Files, PDFs<br/>Certificates"]
     end
@@ -271,15 +277,15 @@ graph TB
     CDN -->|HTTPS| LB
     LB --> API1
     LB --> API2
-    API1 --> PG_PRIMARY
-    API2 --> PG_PRIMARY
+    API1 --> SQL_PRIMARY
+    API2 --> SQL_PRIMARY
     API1 --> REDIS
     API2 --> REDIS
     API1 --> AI
     API1 --> BLOB
-    BG --> PG_PRIMARY
+    BG --> SQL_PRIMARY
     BG --> REDIS
-    PG_PRIMARY -->|Streaming Replication| PG_REPLICA
+    SQL_PRIMARY -->|Always On AG| SQL_REPLICA
     API1 --> SEQ
     API2 --> SEQ
     API1 --> HEALTH
@@ -289,9 +295,9 @@ graph TB
 
 | Ortam | API Instances | DB | Cache | AI | Monitoring |
 |-------|--------------|-----|-------|-----|------------|
-| **Development** | 1 | PostgreSQL (Docker) | IMemoryCache | Mock/Local | Console |
-| **Staging** | 2 | PostgreSQL (Managed) | Redis (Single) | FastAPI (Docker) | Seq |
-| **Production** | 2+ (Auto-scale) | PostgreSQL (HA Cluster) | Redis (Cluster) | FastAPI (K8s) | Seq + ELK |
+| **Development** | 1 | SQL Server 2022 (Docker) | IMemoryCache | Mock/Local | Console |
+| **Staging** | 2 | SQL Server 2022 (Managed) | Redis (Single) | FastAPI (Docker) | Seq |
+| **Production** | 2+ (Auto-scale) | SQL Server 2022 (Always On AG) | Redis (Cluster) | FastAPI (K8s) | Seq + ELK |
 
 ---
 
@@ -368,7 +374,7 @@ sequenceDiagram
     participant M as 📱 Mobile App
     participant GW as 🔀 API Gateway
     participant API as 🖥️ SafeFlow API
-    participant DB as 🐘 PostgreSQL
+    participant DB as 🗄️ SQL Server
     participant EVT as 📨 Domain Events (MediatR)
     participant CERT as 📜 Certificate Module
     participant NOTIF as 🔔 Notification Module

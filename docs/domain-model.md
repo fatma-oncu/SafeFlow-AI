@@ -2,7 +2,7 @@
 
 > **Versiyon:** 1.1  
 > **Tarih:** 2026-07-07  
-> **Durum:** Taslak — Onay Bekliyor  
+> **Durum:** ✅ Onaylandı
 > **Yaklaşım:** Domain-Driven Design (DDD)
 
 > [!IMPORTANT]
@@ -50,17 +50,17 @@ graph TB
         AI_PPE["👁️ AI PPE Context<br/>YOLO KKD Tespiti"]
     end
 
-    TRAINING -->|"TrainingCompleted"| CERT
-    TRAINING -->|"ParticipantEnrolled"| NOTIFICATION
-    CERT -->|"CertificateExpiring"| NOTIFICATION
-    RISK -->|"HighRiskIdentified"| NOTIFICATION
-    RISK -->|"RiskAssessmentCompleted"| CAPA
-    INCIDENT -->|"IncidentReported"| CAPA
-    INCIDENT -->|"IncidentReported"| NOTIFICATION
-    AUDIT -->|"FindingCreated"| CAPA
-    CAPA -->|"CorrectiveActionRequired"| NOTIFICATION
-    AI_RISK -->|"RiskRecommendation"| RISK
-    AI_PPE -->|"PPEViolationDetected"| INCIDENT
+    TRAINING -->|"TrainingCompletedDomainEvent"| CERT
+    TRAINING -->|"ParticipantEnrolledDomainEvent"| NOTIFICATION
+    CERT -->|"CertificateExpiringDomainEvent"| NOTIFICATION
+    RISK -->|"HighRiskIdentifiedDomainEvent"| NOTIFICATION
+    RISK -->|"RiskAssessmentCompletedDomainEvent"| CAPA
+    INCIDENT -->|"IncidentReportedDomainEvent"| CAPA
+    INCIDENT -->|"IncidentReportedDomainEvent"| NOTIFICATION
+    AUDIT -->|"FindingCreatedDomainEvent"| CAPA
+    CAPA -->|"CorrectiveActionRequiredDomainEvent"| NOTIFICATION
+    AI_RISK -->|"RiskRecommendationDomainEvent"| RISK
+    AI_PPE -->|"PPEViolationDetectedDomainEvent"| INCIDENT
 
     IDENTITY -.->|"Shared Kernel"| TRAINING
     IDENTITY -.->|"Shared Kernel"| CERT
@@ -192,25 +192,22 @@ classDiagram
         +Email Email
         +FullName FullName
         +PhoneNumber? PhoneNumber
-        +PasswordHash PasswordHash
         +UserStatus Status
-        +Guid TenantId
-        +List~UserRole~ Roles
-        +List~RefreshToken~ RefreshTokens
+        +Guid TenantId              // ★ TenantId is the Guid mapping to the Company.Id (1 Tenant = 1 Company)
+        +bool EmailConfirmed
         +DateTime? LastLoginAt
         +int FailedLoginAttempts
         +DateTime? LockoutEnd
         +Activate()
         +Deactivate()
         +Lock()
-        +AssignRole(role)
-        +RemoveRole(role)
+        +Unlock()
+        +ConfirmEmail()
+        +AssignRole(roleId, assignedBy)
+        +RemoveRole(roleId)
         +UpdateProfile(name, phone)
-        +RecordLogin()
-        +RecordFailedLogin()
-        +AddRefreshToken(token)
-        +RevokeRefreshToken(token)
-        +RotateRefreshToken(oldToken, newToken)
+        +RecordSuccessfulLogin()
+        +RecordFailedLogin(maxAttempts)
     }
 
     class Email {
@@ -233,28 +230,6 @@ classDiagram
         +string Formatted
     }
 
-    class PasswordHash {
-        <<Value Object>>
-        +string Hash
-        +string Salt
-        +Verify(password)
-    }
-
-    class RefreshToken {
-        <<Entity>>
-        +Guid Id
-        +string Token
-        +DateTime ExpiresAt
-        +DateTime CreatedAt
-        +string CreatedByIp
-        +DateTime? RevokedAt
-        +string? RevokedByIp
-        +string? ReplacedByToken
-        +bool IsExpired
-        +bool IsRevoked
-        +bool IsActive
-    }
-
     class UserRole {
         <<Entity>>
         +Guid UserId
@@ -274,27 +249,66 @@ classDiagram
     User *-- Email
     User *-- FullName
     User *-- PhoneNumber
-    User *-- PasswordHash
     User *-- UserStatus
-    User "1" *-- "0..*" RefreshToken
     User "1" *-- "0..*" UserRole
 ```
 
-### 3.2 User State Machine
+> [!NOTE]
+> **Password hashing** is delegated to Microsoft Identity's `IPasswordHasher<ApplicationUser>` in Infrastructure.
+> The Domain `User` entity does NOT hold password data (ADR-001: Pragmatic Isolation).
+
+### 3.2 RefreshToken Entity (Separate Table)
+
+RefreshToken is NOT part of the User aggregate — it lives in its own table with a FK to `AspNetUsers.Id`.
+
+```mermaid
+classDiagram
+    class RefreshToken {
+        <<Entity>>
+        +Guid Id
+        +Guid UserId
+        +string TokenHash
+        +DateTime ExpiresAt
+        +DateTime CreatedAt
+        +string CreatedByIp
+        +string? UserAgent
+        +DateTime? RevokedAt
+        +string? RevokedByIp
+        +string? RevokedReason
+        +string? ReplacedByTokenHash
+        +string FamilyId
+        +bool IsExpired
+        +bool IsRevoked
+        +bool IsActive
+        +Revoke(ipAddress, reason, replacedByTokenHash)
+    }
+```
+
+> [!IMPORTANT]
+> - Only **SHA256 hash** of the token is stored in DB — plain text is NEVER persisted.
+> - **FamilyId** enables stolen token detection: if a revoked token is reused, all tokens in that family are revoked.
+> - Supports **multi-session**: one user can have multiple active tokens (mobile + web + tablet).
+
+### 3.3 User State Machine
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Pending : Register
-    Pending --> Active : Activate (Email Verify)
-    Active --> Inactive : Deactivate
-    Active --> Locked : 5 Failed Logins
-    Inactive --> Active : Reactivate
-    Locked --> Active : Unlock (Admin / Timeout)
+    [*] --> Pending : Register (EmailConfirmed=false)
+    Pending --> Active : ConfirmEmail (email verified)
+    Active --> Inactive : Deactivate (admin)
+    Active --> Locked : RecordFailedLogin (5th attempt)
+    Inactive --> Active : Activate (admin)
+    Locked --> Active : Unlock (admin / timeout)
     Active --> [*] : Delete (Soft)
     Inactive --> [*] : Delete (Soft)
+
+    note right of Pending
+        Login BLOCKED
+        "Email not verified"
+    end note
 ```
 
-### 3.3 Aggregate: Role
+### 3.4 Aggregate: Role
 
 ```mermaid
 classDiagram
@@ -327,7 +341,7 @@ classDiagram
     RolePermission *-- Permission
 ```
 
-### 3.4 Permission Keys
+### 3.5 Permission Keys
 
 ```
 Permissions:
@@ -354,6 +368,12 @@ Permissions:
     - companies.create
     - companies.update
     - companies.manage-departments
+  Employees:
+    - employees.view
+    - employees.create
+    - employees.update
+    - employees.delete
+    - employees.transfer
   Reports:
     - reports.view
     - reports.generate
@@ -367,47 +387,70 @@ Permissions:
     - system.view-audit-log
 ```
 
-### 3.5 Domain Events — Identity Context
+### 3.6 Domain Events — Identity Context
 
 ```csharp
-public record UserCreated(Guid UserId, Guid TenantId, string Email) : DomainEvent
-{
-    public override string EventType => "Identity.UserCreated";
-}
+public sealed record UserRegisteredDomainEvent(
+    Guid UserId, string Email, string FullName, Guid TenantId
+) : DomainEvent;
 
-public record UserActivated(Guid UserId) : DomainEvent
-{
-    public override string EventType => "Identity.UserActivated";
-}
+public sealed record EmailVerificationSentDomainEvent(
+    Guid UserId, string Email
+) : DomainEvent;
 
-public record UserLocked(Guid UserId, string Reason) : DomainEvent
-{
-    public override string EventType => "Identity.UserLocked";
-}
+public sealed record UserActivatedDomainEvent(
+    Guid UserId
+) : DomainEvent;
 
-public record RoleAssigned(Guid UserId, Guid RoleId, string RoleName) : DomainEvent
-{
-    public override string EventType => "Identity.RoleAssigned";
-}
+public sealed record UserLockedDomainEvent(
+    Guid UserId, string Reason, int FailedAttempts
+) : DomainEvent;
 
-public record RefreshTokenRotated(Guid UserId, string OldToken, string NewToken) : DomainEvent
-{
-    public override string EventType => "Identity.RefreshTokenRotated";
-}
+public sealed record UserDeactivatedDomainEvent(
+    Guid UserId, string DeactivatedBy
+) : DomainEvent;
+
+public sealed record RoleAssignedDomainEvent(
+    Guid UserId, Guid RoleId, string RoleName
+) : DomainEvent;
+
+public sealed record RoleRemovedDomainEvent(
+    Guid UserId, Guid RoleId
+) : DomainEvent;
+
+public sealed record RefreshTokenRotatedDomainEvent(
+    Guid UserId, string IpAddress
+) : DomainEvent;
+
+public sealed record RefreshTokenRevokedDomainEvent(
+    Guid UserId, string Reason, bool IsStolenTokenDetection
+) : DomainEvent;
+
+public sealed record PasswordChangedDomainEvent(
+    Guid UserId
+) : DomainEvent;
+
+public sealed record PasswordResetRequestedDomainEvent(
+    Guid UserId, string Email
+) : DomainEvent;
 ```
 
 ---
 
-## 4. Company Context
+## 4. Company Context (Tenant)
 
-### 4.1 Aggregate: Company (Tenant)
+> [!IMPORTANT]
+> **MVP Kararı: 1 Tenant = 1 Company.** Kayıt sırasında oluşturulan her Tenant aynı zamanda
+> bir Company kaydıdır. `Company.Id` aynı zamanda `TenantId` olarak kullanılır. Gelecekte
+> OSGB modeli (1 Tenant = N Company) desteklenebilir ancak MVP'de bu ayrım yoktur.
+
+### 4.1 Aggregate: Company (= Tenant for MVP)
 
 ```mermaid
 classDiagram
     class Company {
         <<Aggregate Root>>
         +Guid Id
-        +Guid TenantId
         +CompanyInfo Info
         +Address Address
         +TaxInfo TaxInfo
@@ -476,17 +519,48 @@ classDiagram
         +bool IsActive
     }
 
+    class CompanyStatus {
+        <<Enumeration>>
+        Pending
+        Active
+        Inactive
+        Suspended
+    }
+
+    class LocationType {
+        <<Enumeration>>
+        HeadOffice
+        Factory
+        Warehouse
+        FieldOffice
+    }
+
     Company *-- CompanyInfo
     Company *-- Address
     Company *-- TaxInfo
     Company *-- SubscriptionPlan
+    Company *-- CompanyStatus
     Company "1" *-- "0..*" Department
     Company "1" *-- "0..*" Location
     Department *-- Department : Parent
     Location *-- Address
+    Location *-- LocationType
 ```
 
-### 4.2 Aggregate: Employee
+---
+
+## 5. Employee Context
+
+> [!NOTE]
+> Employee is a **separate Bounded Context** (Supporting Domain). It references Company
+> Context entities (DepartmentId, LocationId) via IDs but has its own aggregate root and
+> independent lifecycle.
+>
+> **Gelecek Planı (Phase 3+):** Çalışan Sağlık Gözetimi (Health Surveillance) bounded context'i
+> eklendiğinde, **İşyeri Hekimi** persona'sı bu Aggregate üzerinden çalışanların muayene (işe giriş,
+> periyodik), aşı, sevk ve sağlık raporlarını takip edecektir.
+
+### 5.1 Aggregate: Employee
 
 ```mermaid
 classDiagram
@@ -551,7 +625,7 @@ classDiagram
     Employee "1" *-- "0..*" EmployeeDocument
 ```
 
-### 4.3 Employee State Machine
+### 5.2 Employee State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -566,11 +640,27 @@ stateDiagram-v2
     Terminated --> [*]
 ```
 
+### 5.3 Domain Events — Employee Context
+
+```csharp
+public sealed record EmployeeHiredDomainEvent(
+    Guid EmployeeId, Guid TenantId, string FullName, Guid DepartmentId
+) : DomainEvent;
+
+public sealed record EmployeeTransferredDomainEvent(
+    Guid EmployeeId, Guid OldDepartmentId, Guid NewDepartmentId
+) : DomainEvent;
+
+public sealed record EmployeeTerminatedDomainEvent(
+    Guid EmployeeId, string Reason, DateTime TerminationDate
+) : DomainEvent;
+```
+
 ---
 
-## 5. Training Context
+## 6. Training Context
 
-### 5.1 Aggregate: Training
+### 6.1 Aggregate: Training
 
 ```mermaid
 classDiagram
@@ -587,9 +677,10 @@ classDiagram
         +Guid InstructorId
         +int MaxParticipants
         +TrainingStatus Status
+        +DeliveryMode DeliveryMode
         +List~TrainingSession~ Sessions
         +List~TrainingMaterial~ Materials
-        +AddSession(date, location, capacity)
+        +AddSession(date, location, capacity, meetingUrl, platform)
         +RemoveSession(sessionId)
         +AddMaterial(title, filePath, type)
         +Publish()
@@ -605,6 +696,8 @@ classDiagram
         +DateTime EndDate
         +string Location
         +int Capacity
+        +string? MeetingUrl
+        +string? Platform
         +SessionStatus Status
         +List~TrainingParticipation~ Participations
         +Enroll(employeeId)
@@ -641,6 +734,13 @@ classDiagram
         Orientation
         Refresher
         SpecialRisk
+    }
+
+    class DeliveryMode {
+        <<Enumeration>>
+        Online
+        FaceToFace
+        Hybrid
     }
 
     class TrainingCategory {
@@ -702,7 +802,7 @@ classDiagram
     TrainingParticipation *-- AttendanceStatus
 ```
 
-### 5.2 Training State Machine
+### 6.2 Training State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -725,53 +825,42 @@ stateDiagram-v2
     }
 ```
 
-### 5.3 Domain Events — Training Context
+### 6.3 Domain Events — Training Context
 
 ```csharp
-public record TrainingCreated(Guid TrainingId, Guid TenantId, string Title, TrainingType Type) : DomainEvent
-{
-    public override string EventType => "Training.TrainingCreated";
-}
+public sealed record TrainingCreatedDomainEvent(
+    Guid TrainingId, Guid TenantId, string Title, TrainingType Type
+) : DomainEvent;
 
-public record TrainingPublished(Guid TrainingId, string Title) : DomainEvent
-{
-    public override string EventType => "Training.TrainingPublished";
-}
+public sealed record TrainingPublishedDomainEvent(
+    Guid TrainingId, string Title
+) : DomainEvent;
 
-public record TrainingSessionScheduled(
-    Guid TrainingId, Guid SessionId, DateTime StartDate, 
-    string Location, int Capacity) : DomainEvent
-{
-    public override string EventType => "Training.SessionScheduled";
-}
+public sealed record TrainingSessionScheduledDomainEvent(
+    Guid TrainingId, Guid SessionId, DateTime StartDate,
+    string Location, int Capacity
+) : DomainEvent;
 
-public record ParticipantEnrolled(
-    Guid TrainingId, Guid SessionId, Guid EmployeeId) : DomainEvent
-{
-    public override string EventType => "Training.ParticipantEnrolled";
-}
+public sealed record ParticipantEnrolledDomainEvent(
+    Guid TrainingId, Guid SessionId, Guid EmployeeId
+) : DomainEvent;
 
-public record TrainingSessionCompleted(
-    Guid TrainingId, Guid SessionId, 
-    int TotalParticipants, int PassedCount) : DomainEvent
-{
-    public override string EventType => "Training.SessionCompleted";
-}
+public sealed record TrainingSessionCompletedDomainEvent(
+    Guid TrainingId, Guid SessionId,
+    int TotalParticipants, int PassedCount
+) : DomainEvent;
 
-public record TrainingCompleted(
+public sealed record TrainingCompletedDomainEvent(
     Guid TrainingId, string Title,
-    List<Guid> PassedEmployeeIds) : DomainEvent
-{
-    public override string EventType => "Training.TrainingCompleted";
-}
+    List<Guid> PassedEmployeeIds
+) : DomainEvent;
 
-public record TrainingCancelled(Guid TrainingId, string Reason) : DomainEvent
-{
-    public override string EventType => "Training.TrainingCancelled";
-}
+public sealed record TrainingCancelledDomainEvent(
+    Guid TrainingId, string Reason
+) : DomainEvent;
 ```
 
-### 5.4 Domain Service: TrainingEligibilityService
+### 6.4 Domain Service: TrainingEligibilityService
 
 ```csharp
 public interface ITrainingEligibilityService
@@ -806,9 +895,9 @@ public record TrainingRenewalInfo(
 
 ---
 
-## 6. Certification Context
+## 7. Certification Context
 
-### 6.1 Aggregate: Certificate
+### 7.1 Aggregate: Certificate
 
 ```mermaid
 classDiagram
@@ -867,7 +956,7 @@ classDiagram
     Certificate *-- CertificateStatus
 ```
 
-### 6.2 Certificate State Machine
+### 7.2 Certificate State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -890,7 +979,7 @@ stateDiagram-v2
     end note
 ```
 
-### 6.3 Aggregate: CertificateTemplate
+### 7.3 Aggregate: CertificateTemplate
 
 ```mermaid
 classDiagram
@@ -922,39 +1011,31 @@ classDiagram
     CertificateTemplate *-- TemplateLayout
 ```
 
-### 6.4 Domain Events — Certification Context
+### 7.4 Domain Events — Certification Context
 
 ```csharp
-public record CertificateIssued(
+public sealed record CertificateIssuedDomainEvent(
     Guid CertificateId, Guid EmployeeId, Guid TrainingId,
-    string CertificateNumber, DateTime ExpiresAt) : DomainEvent
-{
-    public override string EventType => "Certification.CertificateIssued";
-}
+    string CertificateNumber, DateTime ExpiresAt
+) : DomainEvent;
 
-public record CertificateExpiring(
+public sealed record CertificateExpiringDomainEvent(
     Guid CertificateId, Guid EmployeeId,
-    string CertificateNumber, DateTime ExpiresAt, 
-    int DaysRemaining) : DomainEvent
-{
-    public override string EventType => "Certification.CertificateExpiring";
-}
+    string CertificateNumber, DateTime ExpiresAt,
+    int DaysRemaining
+) : DomainEvent;
 
-public record CertificateExpired(
+public sealed record CertificateExpiredDomainEvent(
     Guid CertificateId, Guid EmployeeId,
-    string CertificateNumber) : DomainEvent
-{
-    public override string EventType => "Certification.CertificateExpired";
-}
+    string CertificateNumber
+) : DomainEvent;
 
-public record CertificateRevoked(
-    Guid CertificateId, string Reason) : DomainEvent
-{
-    public override string EventType => "Certification.CertificateRevoked";
-}
+public sealed record CertificateRevokedDomainEvent(
+    Guid CertificateId, string Reason
+) : DomainEvent;
 ```
 
-### 6.5 Domain Service: CertificateIssuanceService
+### 7.5 Domain Service: CertificateIssuanceService
 
 ```csharp
 public interface ICertificateIssuanceService
@@ -982,9 +1063,9 @@ public interface ICertificateIssuanceService
 
 ---
 
-## 7. Risk Assessment Context (Phase 1)
+## 8. Risk Assessment Context (Phase 1)
 
-### 7.1 Aggregate: RiskAssessment
+### 8.1 Aggregate: RiskAssessment
 
 ```mermaid
 classDiagram
@@ -1067,7 +1148,7 @@ classDiagram
     RiskAssessment *-- RiskMethodType
 ```
 
-### 7.2 Fine-Kinney Value Table
+### 8.2 Fine-Kinney Value Table
 
 ```
 Fine-Kinney Risk Score = Probability × Severity × Frequency
@@ -1093,9 +1174,9 @@ Risk Level:
 
 ---
 
-## 8. Incident Context (Phase 2)
+## 9. Incident Context (Phase 2)
 
-### 8.1 Aggregate: Incident
+### 9.1 Aggregate: Incident
 
 ```mermaid
 classDiagram
@@ -1149,16 +1230,27 @@ classDiagram
         EnvironmentalIncident
     }
 
+    class IncidentEvidence {
+        <<Entity>>
+        +Guid Id
+        +string Description
+        +string FilePath
+        +string FileType
+        +DateTime UploadedAt
+    }
+
     Incident "1" *-- "0..*" AffectedPerson
     Incident "1" *-- "0..1" Investigation
+    Incident "1" *-- "0..*" IncidentEvidence
     Incident *-- IncidentType
+```,StartLine:1225,TargetContent:
 ```
 
 ---
 
-## 9. Notification Context
+## 10. Notification Context
 
-### 9.1 Aggregate: Notification
+### 10.1 Aggregate: Notification
 
 ```mermaid
 classDiagram
@@ -1204,7 +1296,148 @@ classDiagram
 
 ---
 
-## 10. Domain Services Summary
+## 11. Audit Context (Supporting Domain)
+
+### 11.1 Aggregate: AuditLog
+
+```mermaid
+classDiagram
+    class AuditLog {
+        <<Aggregate Root>>
+        +Guid Id
+        +Guid TenantId
+        +Guid? UserId
+        +string? Email
+        +AuditAction Action
+        +string IpAddress
+        +string? UserAgent
+        +string? AdditionalData
+        +DateTime Timestamp
+        +bool IsSuccess
+        +string? FailureReason
+    }
+
+    class AuditAction {
+        <<Enumeration>>
+        Register
+        EmailVerified
+        Login
+        LoginFailed
+        Logout
+        TokenRefreshed
+        StolenTokenDetected
+        PasswordChanged
+        PasswordResetRequested
+        UserLocked
+    }
+
+    AuditLog *-- AuditAction
+```
+
+---
+
+## 12. CAPA Context (Supporting Domain)
+
+### 12.1 Aggregate: CorrectiveAction
+
+```mermaid
+classDiagram
+    class CorrectiveAction {
+        <<Aggregate Root>>
+        +Guid Id
+        +Guid TenantId
+        +string Title
+        +string Description
+        +CapaSource Source
+        +Guid SourceId
+        +Guid? AssignedToId
+        +Guid CreatedById
+        +CapaStatus Status
+        +DateTime CreatedAt
+        +DateTime TargetDate
+        +DateTime? CompletionDate
+        +string? ActionsTaken
+        +AssignTo(employeeId)
+        +StartExecution()
+        +SubmitForReview()
+        +Close(actionsTaken)
+        +Cancel(reason)
+    }
+
+    class CapaSource {
+        <<Enumeration>>
+        RiskAssessment
+        IncidentReport
+        AuditFinding
+        Manual
+    }
+
+    class CapaStatus {
+        <<Enumeration>>
+        Open
+        InProgress
+        UnderReview
+        Closed
+        Cancelled
+    }
+
+    CorrectiveAction *-- CapaSource
+    CorrectiveAction *-- CapaStatus
+```
+
+### 12.2 Domain Events — CAPA Context
+
+```csharp
+public sealed record CorrectiveActionCreatedDomainEvent(
+    Guid CorrectiveActionId, Guid TenantId, string Title
+) : DomainEvent;
+
+public sealed record CorrectiveActionAssignedDomainEvent(
+    Guid CorrectiveActionId, Guid AssignedToId
+) : DomainEvent;
+
+public sealed record CorrectiveActionClosedDomainEvent(
+    Guid CorrectiveActionId, DateTime ClosedAt
+) : DomainEvent;
+```
+
+---
+
+## 13. Document Context (Generic Domain)
+
+### 13.1 Aggregate: Document
+
+```mermaid
+classDiagram
+    class Document {
+        <<Aggregate Root>>
+        +Guid Id
+        +Guid TenantId
+        +string Title
+        +string FileName
+        +string FilePath
+        +long FileSize
+        +string ContentType
+        +Guid UploadedById
+        +DateTime UploadedAt
+        +DocumentPurpose Purpose
+    }
+
+    class DocumentPurpose {
+        <<Enumeration>>
+        EmployeeDocument
+        TrainingMaterial
+        CertificateTemplate
+        IncidentEvidence
+        AuditReport
+    }
+
+    Document *-- DocumentPurpose
+```
+
+---
+
+## 14. Domain Services Summary
 
 | Context | Domain Service | Sorumluluk |
 |---------|---------------|------------|
@@ -1219,7 +1452,7 @@ classDiagram
 
 ---
 
-## 11. Repository Contracts (Domain/Feature Bazlı)
+## 15. Repository Contracts (Domain/Feature Bazlı)
 
 Generic Repository **kullanılmayacaktır**. Her Aggregate Root için ayrı, domain-specific repository tanımlanır. EF Core yeteneklerinden (LINQ, Include, AsSplitQuery) doğrudan yararlanılır.
 
@@ -1292,22 +1525,22 @@ public interface IUnitOfWork
 
 ---
 
-## 12. Domain Event Flow — End-to-End
+## 16. Domain Event Flow — End-to-End
 
 ```mermaid
 graph LR
     subgraph "Training Context"
-        A["Training.Complete()"] --> B["TrainingCompleted Event"]
+        A["Training.Complete()"] --> B["TrainingCompletedDomainEvent"]
     end
 
     subgraph "MediatR (In-Process)"
-        B --> C["INotificationHandler<br/>TrainingCompleted"]
+        B --> C["INotificationHandler<br/>TrainingCompletedDomainEvent"]
     end
 
     subgraph "Certification Context"
         C --> D["CertificateIssuanceService<br/>.IssueBulkCertificates()"]
         D --> E["Certificate.Issue()"]
-        E --> F["CertificateIssued Event"]
+        E --> F["CertificateIssuedDomainEvent"]
     end
 
     subgraph "Notification Context"
@@ -1330,6 +1563,6 @@ graph LR
 | # | Soru | Etki |
 |---|------|------|
 | 1 | Flutter state management olarak **Riverpod** mı yoksa **Bloc** mu tercih edilecek? | Repository Layer yapısı |
-| 2 | Multi-tenant yapı: **Schema-per-tenant** mı yoksa **Row-Level Security** mi? | Company Aggregate, DB tasarımı |
+| 2 | ~~Multi-tenant yapı: Schema-per-tenant mi yoksa Row-Level Security mi?~~ **Çözüldü: EF Core Global Query Filter (1 Tenant = 1 Company for MVP)** | Company Aggregate, DB tasarımı |
 | 3 | Eğitim tipleri ve kategorileri Türk İSG mevzuatına göre sabit mi olmalı, yoksa tenant bazlı özelleştirilebilir mi? | Training Aggregate, Rule Engine |
 | 4 | Sertifika numarası formatı için tercih var mı? (Örn: `SF-2026-00001`) | CertificateNumber Value Object |

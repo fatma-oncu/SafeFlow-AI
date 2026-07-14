@@ -109,13 +109,13 @@ SafeFlow.Application.Notifications.EventHandlers.ParticipantEnrolledNotification
 
 ### Bağımlı Olduğu Görevler
 - TASK 9.2 (Repository)
-- TASK 5.5 (TrainingPublished event)
-- TASK 7.6 (CertificateIssued event)
+- TASK 5.5 (TrainingPublishedDomainEvent event)
+- TASK 7.6 (CertificateIssuedDomainEvent event)
 
 ### Acceptance Criteria
-- [ ] TrainingPublished → departman çalışanlarına in-app bildirim
-- [ ] CertificateIssued → çalışana in-app + email bildirim
-- [ ] CertificateExpiring → çalışan + İSG uzmanına bildirim
+- [ ] TrainingPublishedDomainEvent → departman çalışanlarına in-app bildirim
+- [ ] CertificateIssuedDomainEvent → çalışana in-app + email bildirim
+- [ ] CertificateExpiringDomainEvent → çalışan + İSG uzmanına bildirim
 - [ ] Bildirim templatelerden üretiliyor
 - [ ] Bildirim veritabanına kaydediliyor (audit trail)
 

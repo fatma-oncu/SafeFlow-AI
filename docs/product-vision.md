@@ -1,8 +1,8 @@
 # SafeFlow-AI — Product Vision & Platform Identity
 
-> **Versiyon:** 1.0  
+> **Versiyon:** 1.1  
 > **Tarih:** 2026-07-07  
-> **Durum:** Onaylandı
+> **Durum:** ✅ Onaylandı
 
 ---
 
@@ -156,7 +156,7 @@ Event-Driven                     MediatR (MVP) → MassTransit (Production)
 CQRS                             Command/Query ayrımı, performans
 Offline-First                    Flutter + SQLite, delta sync
 AI-Ready                         FastAPI mikroservis, model versiyonlama
-Multi-Tenant                     Row-Level Security, tenant isolation
+Multi-Tenant                     EF Core Global Query Filter, tenant isolation
 Security-First                   JWT, RBAC, rate limiting, CSP, XSS koruması
 Observable                       Correlation ID, structured logging, health check
 Rule Engine Ready                IRuleEngine soyutlaması, configurable iş kuralları

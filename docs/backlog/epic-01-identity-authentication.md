@@ -28,20 +28,18 @@ Tüm kimlik ve yetkilendirme işlemleri User entity'si üzerine inşa edilir. Us
 Mimari dokümanda tanımlanan User Aggregate Root, RefreshToken Entity ve ilgili Value Object'leri implemente etmek.
 
 ### Teknik Açıklama
-User, AggregateRoot'tan türeyecek. Email, FullName, PhoneNumber, PasswordHash value object olarak modellenecek. UserStatus enumeration kullanılacak. RefreshToken entity olarak User aggregate içinde yer alacak. Tüm domain business rule'ları (lockout, max failed attempts) User entity içinde kapsüllenecek.
+User, AggregateRoot'tan türeyecek. Email, FullName, PhoneNumber value object olarak modellenecek. UserStatus enumeration kullanılacak. RefreshToken **ayrı tablo entity** olarak modellenecek (User aggregate içinde değil). Password hashing Microsoft Identity'nin `IPasswordHasher<ApplicationUser>` soyutlamasına delege edilecek (ADR-001). Tüm domain business rule'ları (lockout, max failed attempts, email verification) User entity içinde kapsüllenecek.
 
-### Yapılacak Teknik İşler
 1. `Email` value object oluştur (regex validation, normalization)
 2. `FullName` value object oluştur (FirstName, LastName, DisplayName)
 3. `PhoneNumber` value object oluştur (country code, format)
-4. `PasswordHash` value object oluştur (hash + salt)
-5. `UserStatus` enumeration oluştur (Pending, Active, Inactive, Locked)
-6. `User` aggregate root oluştur (ITenantEntity, IAuditableEntity)
-7. `RefreshToken` entity oluştur (expiry, revoke, rotate)
-8. `UserRole` entity oluştur (userId, roleId, assignedAt)
-9. User domain metotları: Activate, Deactivate, Lock, AssignRole, RemoveRole, RecordLogin, RecordFailedLogin, AddRefreshToken, RevokeRefreshToken, RotateRefreshToken
-10. Domain event'ler: UserCreated, UserActivated, UserLocked, RoleAssigned
-11. Unit test'ler yaz (tüm domain metotları ve state geçişleri)
+4. `UserStatus` enumeration oluştur (Pending, Active, Inactive, Locked)
+5. `User` aggregate root oluştur (ITenantEntity, IAuditableEntity, EmailConfirmed)
+6. `RefreshToken` entity oluştur (ayrı tablo, TokenHash, FamilyId, expiry, revoke)
+7. `UserRole` entity oluştur (userId, roleId, assignedAt)
+8. User domain metotları: Activate, Deactivate, Lock, Unlock, ConfirmEmail, AssignRole, RemoveRole, RecordSuccessfulLogin, RecordFailedLogin, UpdateProfile
+9. Domain event'ler: UserRegisteredDomainEvent, UserActivatedDomainEvent, UserLockedDomainEvent, UserDeactivatedDomainEvent, RoleAssignedDomainEvent, RoleRemovedDomainEvent, RefreshTokenRotatedDomainEvent, RefreshTokenRevokedDomainEvent, PasswordChangedDomainEvent, EmailVerificationSentDomainEvent
+10. Unit test'ler yaz (tüm domain metotları ve state geçişleri)
 
 ### Oluşturulacak Sınıflar
 ```csharp
@@ -51,13 +49,17 @@ SafeFlow.Domain.Identity.Entities.UserRole
 SafeFlow.Domain.Identity.ValueObjects.Email
 SafeFlow.Domain.Identity.ValueObjects.FullName
 SafeFlow.Domain.Identity.ValueObjects.PhoneNumber
-SafeFlow.Domain.Identity.ValueObjects.PasswordHash
 SafeFlow.Domain.Identity.Enums.UserStatus
-SafeFlow.Domain.Identity.Events.UserCreated
-SafeFlow.Domain.Identity.Events.UserActivated
-SafeFlow.Domain.Identity.Events.UserLocked
-SafeFlow.Domain.Identity.Events.RoleAssigned
-SafeFlow.Domain.Identity.Events.RefreshTokenRotated
+SafeFlow.Domain.Identity.Events.UserRegisteredDomainEvent
+SafeFlow.Domain.Identity.Events.UserActivatedDomainEvent
+SafeFlow.Domain.Identity.Events.UserLockedDomainEvent
+SafeFlow.Domain.Identity.Events.UserDeactivatedDomainEvent
+SafeFlow.Domain.Identity.Events.RoleAssignedDomainEvent
+SafeFlow.Domain.Identity.Events.RoleRemovedDomainEvent
+SafeFlow.Domain.Identity.Events.RefreshTokenRotatedDomainEvent
+SafeFlow.Domain.Identity.Events.RefreshTokenRevokedDomainEvent
+SafeFlow.Domain.Identity.Events.PasswordChangedDomainEvent
+SafeFlow.Domain.Identity.Events.EmailVerificationSentDomainEvent
 ```
 
 ### Oluşturulacak Dosyalar
@@ -68,13 +70,17 @@ src/SafeFlow.Domain/Identity/Entities/UserRole.cs
 src/SafeFlow.Domain/Identity/ValueObjects/Email.cs
 src/SafeFlow.Domain/Identity/ValueObjects/FullName.cs
 src/SafeFlow.Domain/Identity/ValueObjects/PhoneNumber.cs
-src/SafeFlow.Domain/Identity/ValueObjects/PasswordHash.cs
 src/SafeFlow.Domain/Identity/Enums/UserStatus.cs
-src/SafeFlow.Domain/Identity/Events/UserCreated.cs
-src/SafeFlow.Domain/Identity/Events/UserActivated.cs
-src/SafeFlow.Domain/Identity/Events/UserLocked.cs
-src/SafeFlow.Domain/Identity/Events/RoleAssigned.cs
-src/SafeFlow.Domain/Identity/Events/RefreshTokenRotated.cs
+src/SafeFlow.Domain/Identity/Events/UserRegisteredDomainEvent.cs
+src/SafeFlow.Domain/Identity/Events/UserActivatedDomainEvent.cs
+src/SafeFlow.Domain/Identity/Events/UserLockedDomainEvent.cs
+src/SafeFlow.Domain/Identity/Events/UserDeactivatedDomainEvent.cs
+src/SafeFlow.Domain/Identity/Events/RoleAssignedDomainEvent.cs
+src/SafeFlow.Domain/Identity/Events/RoleRemovedDomainEvent.cs
+src/SafeFlow.Domain/Identity/Events/RefreshTokenRotatedDomainEvent.cs
+src/SafeFlow.Domain/Identity/Events/RefreshTokenRevokedDomainEvent.cs
+src/SafeFlow.Domain/Identity/Events/PasswordChangedDomainEvent.cs
+src/SafeFlow.Domain/Identity/Events/EmailVerificationSentDomainEvent.cs
 tests/SafeFlow.Domain.Tests/Identity/UserTests.cs
 tests/SafeFlow.Domain.Tests/Identity/ValueObjects/EmailTests.cs
 tests/SafeFlow.Domain.Tests/Identity/ValueObjects/FullNameTests.cs
@@ -131,17 +137,16 @@ tests/SafeFlow.Domain.Tests/Identity/RefreshTokenTests.cs
 - **Domain** (tek etkilenen katman)
 
 ### Domain Event
-- `UserCreated` — User oluşturulduğunda
-- `UserActivated` — Activate() çağrıldığında
-- `UserLocked` — 5. başarısız login'de
-- `RoleAssigned` — AssignRole() çağrıldığında
-- `RefreshTokenRotated` — RotateRefreshToken() çağrıldığında
+- `UserRegisteredDomainEvent` — User oluşturulduğunda
+- `UserActivatedDomainEvent` — Activate() çağrıldığında
+- `UserLockedDomainEvent` — 5. başarısız login'de
+- `RoleAssignedDomainEvent` — AssignRole() çağrıldığında
+- `RefreshTokenRotatedDomainEvent` — RotateRefreshToken() çağrıldığında
 
 ### Validation Kuralları
 - Email formatı geçerli olmalı (regex)
 - FirstName, LastName boş olamaz (max 100 karakter)
 - PhoneNumber formatı doğru olmalı
-- PasswordHash boş olamaz
 
 ### Authorization Policy
 - Yok (domain katmanı)
@@ -174,9 +179,9 @@ tests/SafeFlow.Domain.Tests/Identity/RefreshTokenTests.cs
 feat(domain): add User aggregate root with value objects and domain events
 
 - Implement User entity with state management (Pending, Active, Locked)
-- Add Email, FullName, PhoneNumber, PasswordHash value objects
-- Add RefreshToken entity with rotation support
-- Add UserCreated, UserActivated, UserLocked domain events
+- Add Email, FullName, PhoneNumber value objects
+- Add RefreshToken entity (separate table)
+- Add UserRegisteredDomainEvent, UserActivatedDomainEvent, UserLockedDomainEvent
 - Add comprehensive unit tests
 ```
 
@@ -474,7 +479,7 @@ Interface Application katmanında, implementasyon Infrastructure katmanında. EF
 2. `UserRepository` implementasyonu (Infrastructure katmanı)
 3. Metotlar: GetByIdAsync, GetByEmailAsync, GetByRefreshTokenAsync, GetByTenantAsync, EmailExistsAsync, AddAsync, Update
 4. DI registration
-5. Integration test'ler yaz (TestContainers ile PostgreSQL)
+5. Integration test'ler yaz (TestContainers ile SQL Server)
 
 ### Oluşturulacak Sınıflar
 ```csharp
@@ -747,7 +752,7 @@ Kullanıcı kaydı sistemin giriş noktasıdır. Register olmadan hiçbir kullan
 CQRS RegisterCommand, handler, validator ve API endpoint oluşturmak.
 
 ### Teknik Açıklama
-RegisterCommand email, password, firstName, lastName, phoneNumber, companyName alacak. Handler: email duplicate kontrolü, password hash, User entity oluşturma, Pending status, UserCreated event dispatch. Validator: email format, password strength, required alanlar.
+RegisterCommand email, password, firstName, lastName, phoneNumber, companyName alacak. Handler: email duplicate kontrolü, password hash, User entity oluşturma, Pending status, UserRegisteredDomainEvent event dispatch. Validator: email format, password strength, required alanlar.
 
 ### Yapılacak Teknik İşler
 1. `RegisterCommand` — ICommand<RegisterResponse> 
@@ -800,7 +805,7 @@ tests/SafeFlow.API.Tests/Controllers/AuthControllerTests.cs
 - [ ] Duplicate email — 409 Conflict
 - [ ] Geçersiz email formatı — 422 Validation Error
 - [ ] Zayıf parola — 422 Validation Error
-- [ ] UserCreated domain event dispatch ediliyor
+- [ ] UserRegisteredDomainEvent domain event dispatch ediliyor
 - [ ] Kullanıcı Pending durumda oluşturuluyor
 
 ### Definition of Done (DoD)
@@ -826,7 +831,7 @@ tests/SafeFlow.API.Tests/Controllers/AuthControllerTests.cs
 - **API** (Controller endpoint)
 
 ### Domain Event
-- `UserCreated` — Kayıt başarılı olduğunda
+- `UserRegisteredDomainEvent` — Kayıt başarılı olduğunda
 
 ### Validation Kuralları
 - Email: zorunlu, valid format, max 256 karakter
@@ -870,7 +875,7 @@ feat(identity): add user registration command and endpoint
 - Implement RegisterCommand with FluentValidation
 - Add RegisterCommandHandler with duplicate email check
 - Add POST /v1/auth/register endpoint
-- Dispatch UserCreated domain event
+- Dispatch UserRegisteredDomainEvent domain event
 - Add unit and integration tests
 ```
 
@@ -942,7 +947,7 @@ tests/SafeFlow.Application.Tests/Identity/Commands/LoginCommandHandlerTests.cs
 - [ ] Yanlış password — 401 Unauthorized + failed attempt arttı
 - [ ] Inactive user — 403 Forbidden
 - [ ] Locked user — 403 Forbidden + lockout süresi bilgisi
-- [ ] 5 başarısız deneme — otomatik lock + UserLocked event
+- [ ] 5 başarısız deneme — otomatik lock + UserLockedDomainEvent event
 - [ ] RefreshToken veritabanına kaydedildi
 
 ### Test Gereksinimleri
@@ -954,8 +959,8 @@ tests/SafeFlow.Application.Tests/Identity/Commands/LoginCommandHandlerTests.cs
 | **Manual Test** | Swagger ile login, jwt.io ile token kontrol |
 
 ### Domain Event
-- `UserLoggedIn` (opsiyonel — audit amaçlı)
-- `UserLocked` — 5. başarısız denemede
+- `UserLoggedInDomainEvent` (opsiyonel — audit amaçlı)
+- `UserLockedDomainEvent` — 5. başarısız denemede
 
 ### Log Kayıtları
 - `[INFO] Login attempt: {Email}`

@@ -25,14 +25,14 @@ Tüm projenin temelini oluşturur. Clean Architecture katman ayrımı olmadan do
 - Gelecekte domain modüllerinin bağımsız ölçeklenmesi
 
 ### Teknik Amaç
-.NET 8 tabanlı, Clean Architecture katmanlı solution yapısını oluşturmak.
+.NET 9 tabanlı, Clean Architecture katmanlı solution yapısını oluşturmak.
 
 ### Teknik Açıklama
 Solution 4 ana katmandan oluşacak: Domain, Application, Infrastructure, API (Presentation). Her katman bağımsız bir Class Library/Web projesi olacak. Bağımlılık yönü dıştan içe doğru olacak (Domain hiçbir şeye bağımlı olmayacak).
 
 ### Yapılacak Teknik İşler
 1. `SafeFlow.sln` solution dosyası oluştur
-2. `src/SafeFlow.Domain` class library projesi oluştur (.NET 8)
+2. `src/SafeFlow.Domain` class library projesi oluştur (.NET 9)
 3. `src/SafeFlow.Application` class library projesi oluştur
 4. `src/SafeFlow.Infrastructure` class library projesi oluştur
 5. `src/SafeFlow.API` web API projesi oluştur
@@ -149,7 +149,7 @@ tests/SafeFlow.API.Tests/SafeFlow.API.Tests.csproj
 - `Directory.Build.props` ile implicit usings ve nullable reference types merkezi yönetilmeli
 
 ### Beklenen Çıktılar
-- Derlenebilir, Clean Architecture uyumlu .NET 8 solution
+- Derlenebilir, Clean Architecture uyumlu .NET 9 solution
 
 ### Önerilen Git Commit Mesajı
 ```
@@ -612,7 +612,7 @@ feat(application): add MediatR pipeline behaviors
 |------|-------|
 | **Epic** | EPIC 0 — Foundation |
 | **Feature** | EF Core DbContext Altyapısı |
-| **User Story** | Geliştirici olarak, PostgreSQL bağlantısı ve EF Core DbContext altyapısı istiyorum ki domain entity'lerini veritabanına persist edebileyim. |
+| **User Story** | Geliştirici olarak, SQL Server bağlantısı ve EF Core DbContext altyapısı istiyorum ki domain entity'lerini veritabanına persist edebileyim. |
 
 ### Neden Yapılıyor?
 Veritabanı erişimi olmadan hiçbir veri kalıcı hale getirilemez. DbContext tüm data access işlemlerinin temelidir.
@@ -624,7 +624,7 @@ Veritabanı erişimi olmadan hiçbir veri kalıcı hale getirilemez. DbContext t
 - Soft delete global query filter
 
 ### Teknik Amaç
-PostgreSQL bağlantılı EF Core DbContext, otomatik audit, soft delete filter ve domain event dispatch altyapısını kurmak.
+SQL Server 2022 bağlantılı EF Core DbContext, otomatik audit, soft delete filter ve domain event dispatch altyapısını kurmak.
 
 ### Teknik Açıklama
 `SafeFlowDbContext` oluşturulacak. `SaveChangesAsync` override edilerek audit alanları otomatik doldurulacak, domain event'ler MediatR üzerinden dispatch edilecek. Global query filter ile soft-deleted entity'ler otomatik filtrelenecek.
@@ -667,12 +667,12 @@ src/SafeFlow.API/appsettings.Development.json
 
 ### Gerekli NuGet Paketleri
 - `Microsoft.EntityFrameworkCore` (Infrastructure)
-- `Npgsql.EntityFrameworkCore.PostgreSQL` (Infrastructure)
+- `Microsoft.EntityFrameworkCore.SqlServer` (Infrastructure)
 - `Microsoft.EntityFrameworkCore.Tools` (API — migration için)
 - `Microsoft.EntityFrameworkCore.Design` (API — migration için)
 
 ### Database Değişiklikleri
-- PostgreSQL veritabanı oluşturulacak (Docker ile)
+- SQL Server veritabanı oluşturulacak (Docker ile)
 
 ### Migration Gerekiyor mu?
 - Hayır (henüz entity yok, InitialCreate migration TASK 1.x'te)
@@ -682,7 +682,7 @@ src/SafeFlow.API/appsettings.Development.json
 - TASK 0.2 (Domain base classes)
 
 ### Acceptance Criteria
-- [ ] DbContext PostgreSQL'e bağlanabiliyor
+- [ ] DbContext SQL Server'a bağlanabiliyor
 - [ ] SaveChangesAsync audit alanlarını otomatik dolduruyor
 - [ ] SaveChangesAsync domain event'leri dispatch ediyor
 - [ ] Soft delete filter çalışıyor
@@ -691,7 +691,7 @@ src/SafeFlow.API/appsettings.Development.json
 
 ### Definition of Done (DoD)
 - [ ] Kod derlenebilir
-- [ ] PostgreSQL bağlantısı doğrulanmış
+- [ ] SQL Server bağlantısı doğrulanmış
 - [ ] Code review tamamlandı
 
 ### Test Gereksinimleri
@@ -699,7 +699,7 @@ src/SafeFlow.API/appsettings.Development.json
 | Test Tipi | Gereksinim |
 |-----------|-----------|
 | **Unit Test** | Audit field doldurma, domain event toplama |
-| **Integration Test** | PostgreSQL bağlantı testi (Docker ile) |
+| **Integration Test** | SQL Server bağlantı testi (Docker ile) |
 | **Manual Test** | Connection string ile bağlantı doğrulama |
 
 ### SOLID & Design Pattern
@@ -737,7 +737,7 @@ src/SafeFlow.API/appsettings.Development.json
 ### Olası Exception'lar
 - `DbUpdateException` (constraint violation)
 - `DbUpdateConcurrencyException` (concurrent update)
-- `NpgsqlException` (bağlantı hatası)
+- `SqlException` (bağlantı hatası)
 
 ### Performans Notları
 - Domain event dispatch SaveChanges içinde yapılacak (same transaction)
@@ -745,17 +745,17 @@ src/SafeFlow.API/appsettings.Development.json
 - `AsSplitQuery()` kullanımına dikkat (N+1 prevention)
 
 ### Beklenen Çıktılar
-- PostgreSQL bağlantılı, audit ve event dispatch destekli DbContext
+- SQL Server bağlantılı, audit ve event dispatch destekli DbContext
 
 ### Önerilen Git Commit Mesajı
 ```
-feat(infrastructure): add EF Core DbContext with PostgreSQL
+feat(infrastructure): add EF Core DbContext with SQL Server
 
 - Implement SafeFlowDbContext with audit field auto-fill
 - Add domain event dispatching on SaveChangesAsync
 - Add soft delete global query filter
 - Implement IUnitOfWork via DbContext
-- Configure PostgreSQL connection
+- Configure SQL Server connection
 ```
 
 ### Tahmini Süre
@@ -929,7 +929,7 @@ ASP.NET Health Checks ile `/health`, `/health/live`, `/health/ready` endpoint'le
 
 ### Yapılacak Teknik İşler
 1. ASP.NET Health Checks NuGet paketini ekle
-2. `DbContextHealthCheck` — PostgreSQL bağlantı kontrolü
+2. `DbContextHealthCheck` — SQL Server bağlantı kontrolü
 3. General health check endpoint `/health` yapılandır
 4. Liveness endpoint `/health/live` yapılandır
 5. Readiness endpoint `/health/ready` yapılandır (DB check dahil)
@@ -954,7 +954,7 @@ src/SafeFlow.API/HealthChecks/HealthCheckResponseWriter.cs
 - `GET /health/ready` — Readiness probe (DB + cache)
 
 ### Gerekli NuGet Paketleri
-- `AspNetCore.HealthChecks.NpgSql` (Infrastructure)
+- `AspNetCore.HealthChecks.SqlServer` (Infrastructure)
 - `Microsoft.Extensions.Diagnostics.HealthChecks` (Infrastructure)
 
 ### Database Değişiklikleri
@@ -1004,7 +1004,7 @@ src/SafeFlow.API/HealthChecks/HealthCheckResponseWriter.cs
 feat(api): add health check endpoints
 
 - Add /health, /health/live, /health/ready endpoints
-- Add DatabaseHealthCheck for PostgreSQL
+- Add DatabaseHealthCheck for SQL Server
 - Customize health check JSON response format
 ```
 
@@ -1232,10 +1232,10 @@ feat(infrastructure): add ICacheService abstraction with MemoryCache
 |------|-------|
 | **Epic** | EPIC 0 — Foundation |
 | **Feature** | Docker Development Environment |
-| **User Story** | Geliştirici olarak, tek komutla PostgreSQL ve tüm bağımlılıkların ayağa kalkmasını istiyorum ki yerel geliştirme ortamında hızlıca çalışmaya başlayabileyim. |
+| **User Story** | Geliştirici olarak, tek komutla SQL Server ve tüm bağımlılıkların ayağa kalkmasını istiyorum ki yerel geliştirme ortamında hızlıca çalışmaya başlayabileyim. |
 
 ### Neden Yapılıyor?
-Her geliştiricinin yerel makinesine PostgreSQL kurması yerine, Docker Compose ile standart geliştirme ortamı sağlanır.
+Her geliştiricinin yerel makinesine SQL Server kurması yerine, Docker Compose ile standart geliştirme ortamı sağlanır.
 
 ### Ürüne Hangi Değeri Katıyor?
 - Onboarding süresi düşer
@@ -1243,16 +1243,16 @@ Her geliştiricinin yerel makinesine PostgreSQL kurması yerine, Docker Compose 
 - CI/CD pipeline ile aynı ortam
 
 ### Teknik Amaç
-Docker Compose ile PostgreSQL (ve gelecekte Redis, Seq) geliştirme ortamını hazırlamak.
+Docker Compose ile SQL Server 2022 (ve gelecekte Redis, Seq) geliştirme ortamını hazırlamak.
 
 ### Teknik Açıklama
-`docker-compose.yml` dosyası PostgreSQL 16, pgAdmin (opsiyonel) ve uygulama için network tanımlayacak. Volume ile veri kalıcılığı sağlanacak.
+`docker-compose.yml` dosyası SQL Server 2022 ve uygulama için network tanımlayacak. Volume ile veri kalıcılığı sağlanacak.
 
 ### Yapılacak Teknik İşler
-1. `docker-compose.yml` oluştur (PostgreSQL 16)
+1. `docker-compose.yml` oluştur (SQL Server 2022)
 2. `docker-compose.override.yml` — geliştirme ortamı ayarları
 3. `.env` dosyası (environment variables)
-4. PostgreSQL init script (veritabanı oluşturma)
+4. SQL Server init script (gerekirse veritabanı oluşturma)
 5. Dockerfile (API projesi için — opsiyonel, gelecek sprint)
 6. `README.md` güncelle (Docker kullanım talimatları)
 
@@ -1261,7 +1261,7 @@ Docker Compose ile PostgreSQL (ve gelecekte Redis, Seq) geliştirme ortamını h
 docker-compose.yml
 docker-compose.override.yml
 .env
-docker/postgres/init.sql
+docker/sqlserver/init.sql
 ```
 
 ### Oluşturulacak Endpointler
@@ -1271,7 +1271,7 @@ docker/postgres/init.sql
 - Yok
 
 ### Database Değişiklikleri
-- PostgreSQL `safeflow_dev` veritabanı oluşturulur
+- SQL Server `safeflow_dev` veritabanı oluşturulur
 
 ### Migration Gerekiyor mu?
 - Hayır (init.sql ile DB oluşturma)
@@ -1280,8 +1280,8 @@ docker/postgres/init.sql
 - Yok (paralel çalışabilir)
 
 ### Acceptance Criteria
-- [ ] `docker-compose up -d` ile PostgreSQL ayağa kalkıyor
-- [ ] API PostgreSQL'e bağlanabiliyor
+- [ ] `docker-compose up -d` ile SQL Server ayağa kalkıyor
+- [ ] API SQL Server'a bağlanabiliyor
 - [ ] Volume ile veri restart sonrası korunuyor
 - [ ] `.env` dosyasından environment variables okunuyor
 
@@ -1305,7 +1305,7 @@ docker/postgres/init.sql
 ```
 feat(devops): add Docker Compose development environment
 
-- Add PostgreSQL 16 service configuration
+- Add SQL Server 2022 service configuration
 - Add init.sql for database creation
 - Add .env file for environment variables
 - Update README with setup instructions

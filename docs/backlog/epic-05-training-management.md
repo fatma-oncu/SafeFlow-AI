@@ -44,7 +44,7 @@ Training aggregate root, TrainingSession, TrainingParticipation, TrainingMateria
 13. Training domain metotları: AddSession, RemoveSession, AddMaterial, Publish, Cancel, Archive, Clone
 14. TrainingSession metotları: Enroll, MarkAttendance, Complete, Cancel
 15. Training state machine: Draft → Published → InProgress → Completed → Archived
-16. Domain events: TrainingCreated, TrainingPublished, TrainingSessionScheduled, ParticipantEnrolled, TrainingSessionCompleted, TrainingCompleted, TrainingCancelled
+16. Domain events: TrainingCreatedDomainEvent, TrainingPublishedDomainEvent, TrainingSessionScheduledDomainEvent, ParticipantEnrolledDomainEvent, TrainingSessionCompletedDomainEvent, TrainingCompletedDomainEvent, TrainingCancelledDomainEvent
 17. Kapsamlı unit test'ler
 
 ### Oluşturulacak Sınıflar
@@ -61,13 +61,13 @@ SafeFlow.Domain.Trainings.Enums.TrainingStatus
 SafeFlow.Domain.Trainings.Enums.SessionStatus
 SafeFlow.Domain.Trainings.Enums.AttendanceStatus
 SafeFlow.Domain.Trainings.Enums.MaterialType
-SafeFlow.Domain.Trainings.Events.TrainingCreated
-SafeFlow.Domain.Trainings.Events.TrainingPublished
-SafeFlow.Domain.Trainings.Events.TrainingSessionScheduled
-SafeFlow.Domain.Trainings.Events.ParticipantEnrolled
-SafeFlow.Domain.Trainings.Events.TrainingSessionCompleted
-SafeFlow.Domain.Trainings.Events.TrainingCompleted
-SafeFlow.Domain.Trainings.Events.TrainingCancelled
+SafeFlow.Domain.Trainings.Events.TrainingCreatedDomainEvent
+SafeFlow.Domain.Trainings.Events.TrainingPublishedDomainEvent
+SafeFlow.Domain.Trainings.Events.TrainingSessionScheduledDomainEvent
+SafeFlow.Domain.Trainings.Events.ParticipantEnrolledDomainEvent
+SafeFlow.Domain.Trainings.Events.TrainingSessionCompletedDomainEvent
+SafeFlow.Domain.Trainings.Events.TrainingCompletedDomainEvent
+SafeFlow.Domain.Trainings.Events.TrainingCancelledDomainEvent
 ```
 
 ### Bağımlı Olduğu Görevler
@@ -245,7 +245,7 @@ feat(infrastructure): add ITrainingRepository with domain-specific queries
 - CategoryCode: geçerli kategori olmalı
 
 ### Domain Event
-- `TrainingCreated`, `TrainingPublished`, `TrainingCancelled`
+- `TrainingCreatedDomainEvent`, `TrainingPublishedDomainEvent`, `TrainingCancelledDomainEvent`
 
 ### Cache
 - Evet — Training listesi kısa süreli cache

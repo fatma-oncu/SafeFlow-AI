@@ -2,7 +2,7 @@
 
 > **Versiyon:** 1.1  
 > **Tarih:** 2026-07-07  
-> **Durum:** Taslak — Onay Bekliyor  
+> **Durum:** ✅ Onaylandı
 > **Format:** OpenAPI 3.1 uyumlu REST API tasarımı  
 > **Base URL:** `https://api.safeflow.ai/v1`
 
@@ -107,7 +107,7 @@
 ## 3. Authentication & Authorization API
 
 ### 3.1 POST `/v1/auth/register`
-Yeni kullanıcı kaydı oluşturur.
+Yeni kullanıcı kaydı oluşturur. Bu işlem yeni bir Tenant (Company) kaydı başlatır. Kaydı gerçekleştiren ilk kullanıcıya otomatik olarak **CompanyAdmin** rolü atanır. Şirket altındaki sonraki kullanıcılar doğrudan üye olamazlar; bunun yerine `/v1/auth/invite` endpoint'i üzerinden davet edilmelidirler.
 
 **Request:**
 ```json
@@ -130,6 +130,46 @@ Yeni kullanıcı kaydı oluşturur.
     "email": "ahmet.yilmaz@company.com",
     "tenantId": "t1t2t3t4-...",
     "status": "Pending"
+  }
+}
+```
+
+
+---
+
+### 3.2 GET `/v1/auth/verify-email`
+Kayıt sonrası gönderilen doğrulama e-postasındaki linke tıklanarak hesap aktivasyonunu tamamlar.
+
+**Query Parameters:**
+- `userId` (Guid, required): Doğrulanacak kullanıcının Id değeri.
+- `token` (string, required): E-posta ile gönderilen aktivasyon token'ı.
+
+**Response: `200 OK`**
+```json
+{
+  "data": {
+    "message": "Email address verified successfully. You can now login."
+  }
+}
+```
+
+---
+
+### 3.3 POST `/v1/auth/resend-verification`
+Doğrulama e-postasını yeniden gönderir. Rate limiting: 3 dakikada en fazla 1 istek.
+
+**Request:**
+```json
+{
+  "email": "ahmet.yilmaz@company.com"
+}
+```
+
+**Response: `200 OK`**
+```json
+{
+  "data": {
+    "message": "Verification email has been resent."
   }
 }
 ```
@@ -235,9 +275,87 @@ Refresh token'ı iptal eder (logout).
 
 **Response: `200 OK`**
 
+**Response: `200 OK`**
+
 ---
 
-### 3.7 GET `/v1/auth/me`
+### 3.9 PUT `/v1/auth/change-password`
+🔒 **Requires:** Authenticated
+
+Giriş yapmış kullanıcının şifresini değiştirir. Bu işlem kullanıcının tüm aktif oturumlarını ve refresh token'larını iptal eder (Sign Out from All Devices).
+
+**Request:**
+```json
+{
+  "currentPassword": "SecureP@ss123",
+  "newPassword": "NewSecureP@ss789"
+}
+```
+
+**Response: `200 OK`**
+```json
+{
+  "data": {
+    "message": "Password changed successfully. Please login again with your new password."
+  }
+}
+```
+
+---
+
+### 3.10 POST `/v1/auth/invite`
+🔒 **Requires:** Authenticated, `users.create` veya `users.assign-role`
+
+Mevcut tenant'a (Company) yeni bir kullanıcı davet etmek için e-posta gönderir.
+
+**Request:**
+```json
+{
+  "email": "mehmet.kaya@company.com",
+  "firstName": "Mehmet",
+  "lastName": "Kaya",
+  "phoneNumber": "+905559876543",
+  "roleId": "r1r2r3r4-..."
+}
+```
+
+**Response: `200 OK`**
+```json
+{
+  "data": {
+    "message": "Invitation sent successfully to mehmet.kaya@company.com."
+  }
+}
+```
+
+---
+
+### 3.11 POST `/v1/auth/accept-invite`
+Davet edilen kullanıcının ilk şifresini belirleyerek profilini aktive etmesini sağlar.
+
+**Request:**
+```json
+{
+  "token": "invitation-token-...",
+  "password": "InitialSecureP@ss123"
+}
+```
+
+**Response: `200 OK`**
+```json
+{
+  "data": {
+    "accessToken": "eyJhbGciOiJSUzI1NiIs...",
+    "refreshToken": "dGhpcyBpcyBhIHJlZnJl...",
+    "expiresIn": 900,
+    "tokenType": "Bearer"
+  }
+}
+```
+
+---
+
+### 3.12 GET `/v1/auth/me`
 🔒 **Requires:** Authenticated
 
 Mevcut kullanıcı bilgilerini döner.
@@ -1074,14 +1192,14 @@ Kontrol eder: DB bağlantısı, cache bağlantısı, disk alanı.
 
 ## 14. Varsayılan Roller
 
-| Rol | Açıklama | Temel İzinler |
-|-----|----------|---------------|
-| **SystemAdmin** | Sistem yöneticisi | Tüm izinler |
-| **CompanyAdmin** | Şirket yöneticisi | Şirket + kullanıcı + rapor |
-| **ISGUzmani** | İSG uzmanı | Eğitim + sertifika + risk + denetim |
-| **ISGHekim** | İşyeri hekimi | Sağlık gözetimi + eğitim (görüntüleme) |
-| **DepartmentManager** | Departman müdürü | Kendi departmanı + dashboard |
-| **Employee** | Çalışan | Kendi bilgileri + eğitim katılım |
+| Rol Kodu (Code) | Rol Görünüm Adı (Turkish Display Name) | Açıklama | Temel İzinler |
+|---|---|---|---|
+| **SystemAdmin** | Sistem Yöneticisi | Teknik yönetici | Tüm izinler |
+| **CompanyAdmin** | Şirket Yöneticisi | Şirket / Tenant yöneticisi | Şirket + kullanıcı + rapor |
+| **ISGUzmani** | İSG Uzmanı | İş Sağlığı ve Güvenliği Uzmanı | Eğitim + sertifika + risk + denetim |
+| **ISGHekim** | İşyeri Hekimi | Şirket hekimi | Sağlık gözetimi + eğitim (görüntüleme) |
+| **DepartmentManager** | Departman Müdürü | Departman yöneticisi | Kendi departmanı + dashboard (İşlemleri ve veri erişimleri yalnızca atandığı `departmentId` ile sınırlıdır) |
+| **Employee** | Çalışan | Şirket çalışanı | Kendi bilgileri + eğitim katılım |
 
 ---
 
@@ -1143,7 +1261,7 @@ Kontrol eder: DB bağlantısı, cache bağlantısı, disk alanı.
   ],
   "iat": 1720339200,
   "exp": 1720340100,
-  "iss": "safeflow-api",
+  "iss": "https://api.safeflow.ai",
   "aud": "safeflow-client"
 }
 ```
@@ -1162,12 +1280,12 @@ Kontrol eder: DB bağlantısı, cache bağlantısı, disk alanı.
 
 ---
 
-## Açık Sorular
+## Açık Sorular & Kararlar
 
-| # | Soru | Etki |
-|---|------|------|
-| 1 | API versiyonlama stratejisi: sadece URL-based mi, yoksa header-based de desteklenecek mi? | Tüm endpoint'ler |
-| 2 | Pagination: Offset-based mi yoksa cursor-based mi tercih edilecek? | Liste endpoint'leri |
-| 3 | Webhook desteği eklenmeli mi? (Örn: sertifika oluşturulunca harici sisteme bildirim) | Entegrasyon |
-| 4 | GraphQL desteği gelecekte planlanıyor mu? | API Gateway |
-| 5 | Dosya yükleme için pre-signed URL yaklaşımı mı, yoksa doğrudan API üzerinden mi? | Dosya endpoint'leri |
+| # | Soru | Karar / Etki |
+|---|------|--------------|
+| 1 | API versiyonlama stratejisi: sadece URL-based mi, yoksa header-based de desteklenecek mi? | **URL-based (`/v1`)**. Sadelik ve caching kolaylığı için MVP'de yalnızca URL versiyonlama kullanılacaktır. |
+| 2 | Pagination: Offset-based mi yoksa cursor-based mi tercih edilecek? | **Offset-based (`page`, `pageSize`)**. MVP listeleri için yeterli ve uygulanması kolaydır. Yüksek hacimli denetim izleri ve mobil sync akışları için gelecekte cursor-based eklenebilir. |
+| 3 | Webhook desteği eklenmeli mi? (Örn: sertifika oluşturulunca harici sisteme bildirim) | **Ertelendi (Phase 3+)**. MVP kapsamında harici webhook tetikleme desteği yer almayacaktır. |
+| 4 | GraphQL desteği gelecekte planlanıyor mu? | **Hayır**. Platform genelinde REST + JSON mimarisi standart kabul edilmiştir. |
+| 5 | Dosya yükleme için pre-signed URL yaklaşımı mı, yoksa doğrudan API üzerinden mi? | **Direct API Upload**. MVP'de dosyalar API multipart request ile yüklenecek, depolama soyutlaması (Azure Blob / MinIO) arkasında saklanıp imzalı URL'ler ile servis edilecektir. |

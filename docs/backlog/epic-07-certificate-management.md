@@ -34,7 +34,7 @@
 6. State machine: Draft → Issued → Active → ExpiringSoon → Expired / Suspended / Revoked
 7. `CertificateTemplate` aggregate root (Name, Description, Layout, IsDefault)
 8. `TemplateLayout` value object (HeaderText, BodyTemplate, FooterText, LogoPath)
-9. Domain events: CertificateIssued, CertificateExpiring, CertificateExpired, CertificateRevoked
+9. Domain events: CertificateIssuedDomainEvent, CertificateExpiringDomainEvent, CertificateExpiredDomainEvent, CertificateRevokedDomainEvent
 10. Unit test'ler
 
 ### Oluşturulacak Sınıflar
@@ -45,10 +45,10 @@ SafeFlow.Domain.Certificates.ValueObjects.CertificateNumber
 SafeFlow.Domain.Certificates.ValueObjects.ValidityPeriod
 SafeFlow.Domain.Certificates.ValueObjects.TemplateLayout
 SafeFlow.Domain.Certificates.Enums.CertificateStatus
-SafeFlow.Domain.Certificates.Events.CertificateIssued
-SafeFlow.Domain.Certificates.Events.CertificateExpiring
-SafeFlow.Domain.Certificates.Events.CertificateExpired
-SafeFlow.Domain.Certificates.Events.CertificateRevoked
+SafeFlow.Domain.Certificates.Events.CertificateIssuedDomainEvent
+SafeFlow.Domain.Certificates.Events.CertificateExpiringDomainEvent
+SafeFlow.Domain.Certificates.Events.CertificateExpiredDomainEvent
+SafeFlow.Domain.Certificates.Events.CertificateRevokedDomainEvent
 ```
 
 ### Bağımlı Olduğu Görevler
@@ -266,7 +266,7 @@ SafeFlow.Application.Certificates.EventHandlers.TrainingCompletedEventHandler
 ### Acceptance Criteria
 - [ ] TrainingSession complete → başarılı katılımcılara otomatik sertifika
 - [ ] Sertifika numarası otomatik sequential
-- [ ] CertificateIssued event dispatch ediliyor
+- [ ] CertificateIssuedDomainEvent event dispatch ediliyor
 - [ ] Başarısız (score < pass) katılımcıya sertifika üretilmiyor
 
 ### Tahmini Süre
@@ -276,9 +276,9 @@ SafeFlow.Application.Certificates.EventHandlers.TrainingCompletedEventHandler
 ```
 feat(application): add auto certificate generation on training completion
 
-- Handle TrainingCompleted domain event
+- Handle TrainingCompletedDomainEvent
 - Generate bulk certificates for passed participants
-- Dispatch CertificateIssued events
+- Dispatch CertificateIssuedDomainEvent events
 ```
 
 ---
