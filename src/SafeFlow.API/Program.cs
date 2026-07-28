@@ -1,14 +1,58 @@
-namespace SafeFlow.API;
+using Asp.Versioning.ApiExplorer;
+using SafeFlow.API;
+using SafeFlow.API.Middleware;
 
-public class Program
+var builder = WebApplication.CreateBuilder(args);
+
+// ── Service Registration ──────────────────────────────────────────────────────
+builder.Services.AddApi(builder.Configuration);
+
+// ── Application Build ─────────────────────────────────────────────────────────
+var app = builder.Build();
+
+// ── Middleware Pipeline ───────────────────────────────────────────────────────
+
+// 1. Global exception handler — must be first
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
+// 2. Security headers
+app.UseHsts();
+app.UseHttpsRedirection();
+
+// 3. Swagger (development + staging)
+if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 {
-    public static void Main(string[] args)
+    var apiVersionDescriptionProvider =
+        app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
     {
-        var builder = WebApplication.CreateBuilder(args);
-        var app = builder.Build();
+        foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions)
+        {
+            options.SwaggerEndpoint(
+                $"/swagger/{description.GroupName}/swagger.json",
+                $"SafeFlow API {description.GroupName.ToUpperInvariant()}");
+        }
 
-        app.MapGet("/", () => "SafeFlow API Foundation");
-
-        app.Run();
-    }
+        options.RoutePrefix = "swagger";
+    });
 }
+
+// 4. Routing
+app.UseRouting();
+
+// 5. Authentication + Authorization
+app.UseAuthentication();
+app.UseAuthorization();
+
+// 6. Controllers
+app.MapControllers();
+
+app.Run();
+
+/// <summary>
+/// Exposes <see cref="Program"/> as a <c>public partial class</c> so that
+/// integration tests can reference the entry point via WebApplicationFactory.
+/// </summary>
+public partial class Program { }
