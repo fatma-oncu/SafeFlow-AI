@@ -11,7 +11,8 @@ namespace SafeFlow.IntegrationTests.Identity;
 /// Uses an in-memory SQLite database and a generated RSA key via
 /// <see cref="SafeFlowWebApplicationFactory"/>.
 /// </summary>
-public sealed class AuthEndpointTests : IClassFixture<SafeFlowWebApplicationFactory>
+[Collection("IntegrationTests")]
+public sealed class AuthEndpointTests
 {
     private readonly HttpClient _client;
 
@@ -137,6 +138,28 @@ public sealed class AuthEndpointTests : IClassFixture<SafeFlowWebApplicationFact
         var response = await _client.GetAsync("/api/v1/users/me");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    // ── POST /api/v1/auth/refresh ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task Refresh_WithoutToken_Returns401Unauthorized()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/refresh", (object?)null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    // ── POST /api/v1/auth/forgot-password ─────────────────────────────────────
+
+    [Fact]
+    public async Task ForgotPassword_Returns222Accepted()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/v1/auth/forgot-password",
+            new { email = "user@example.com" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
     }
 
     // ── Health ────────────────────────────────────────────────────────────────

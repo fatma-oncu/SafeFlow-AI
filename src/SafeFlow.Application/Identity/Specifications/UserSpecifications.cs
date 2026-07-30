@@ -20,7 +20,6 @@ public sealed class UserByEmailSpecification : BaseSpecification<User>
         : base(u => u.Email.Value == email.ToLowerInvariant().Trim())
     {
         AddInclude(u => u.UserRoles);
-        ApplyNoTracking();
     }
 }
 

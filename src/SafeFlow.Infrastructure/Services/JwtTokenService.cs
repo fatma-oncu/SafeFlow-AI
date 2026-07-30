@@ -25,15 +25,12 @@ namespace SafeFlow.Infrastructure.Services;
 /// is returned to the caller once and never persisted.
 /// </para>
 /// </remarks>
-internal sealed class JwtTokenService : IJwtTokenService, IDisposable
+internal sealed class JwtTokenService : IJwtTokenService
 {
     private readonly JwtSettings _settings;
-    private readonly RSA _rsa;
-    private readonly RsaSecurityKey _signingKey;
-    private readonly SigningCredentials _signingCredentials;
 
     /// <summary>
-    /// Initialises a new <see cref="JwtTokenService"/> and loads the RSA key.
+    /// Initialises a new <see cref="JwtTokenService"/>.
     /// </summary>
     /// <param name="options">Bound JWT configuration.</param>
     /// <exception cref="InvalidOperationException">
@@ -49,12 +46,6 @@ internal sealed class JwtTokenService : IJwtTokenService, IDisposable
                 "JWT RSA private key is not configured. " +
                 "Set JwtSettings:RsaPrivateKeyPem via environment variable or Key Vault.");
         }
-
-        _rsa = RSA.Create();
-        _rsa.ImportFromPem(_settings.RsaPrivateKeyPem.AsSpan());
-
-        _signingKey = new RsaSecurityKey(_rsa);
-        _signingCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256);
     }
 
     /// <inheritdoc/>
@@ -90,6 +81,12 @@ internal sealed class JwtTokenService : IJwtTokenService, IDisposable
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
         claims.AddRange(permissions.Select(p => new Claim("permission", p)));
 
+        using var tempRsa = RSA.Create();
+        tempRsa.ImportFromPem(_settings.RsaPrivateKeyPem.AsSpan());
+        var rsaParams = tempRsa.ExportParameters(includePrivateParameters: true);
+        var signingKey = new RsaSecurityKey(rsaParams);
+        var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.RsaSha256);
+
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
@@ -97,7 +94,7 @@ internal sealed class JwtTokenService : IJwtTokenService, IDisposable
             NotBefore = now,
             Issuer = _settings.Issuer,
             Audience = _settings.Audience,
-            SigningCredentials = _signingCredentials,
+            SigningCredentials = signingCredentials,
         };
 
         var handler = new JwtSecurityTokenHandler();
@@ -122,7 +119,4 @@ internal sealed class JwtTokenService : IJwtTokenService, IDisposable
         byte[] hashBytes = SHA256.HashData(inputBytes);
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
-
-    /// <inheritdoc/>
-    public void Dispose() => _rsa.Dispose();
 }
