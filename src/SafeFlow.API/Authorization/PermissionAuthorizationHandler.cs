@@ -29,7 +29,9 @@ public sealed class PermissionAuthorizationHandler
     {
         bool hasPermission = context.User.Claims
             .Any(c => c.Type == PermissionClaimType
-                   && c.Value == requirement.Permission);
+                   && (c.Value == requirement.Permission ||
+                       c.Value.Replace('.', ':') == requirement.Permission ||
+                       c.Value.Replace(':', '.') == requirement.Permission));
 
         if (hasPermission)
         {

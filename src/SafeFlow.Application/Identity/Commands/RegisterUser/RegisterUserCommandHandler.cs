@@ -99,6 +99,7 @@ public sealed class RegisterUserCommandHandler(
             : null;
 
         var user = User.Create(userId, email, fullName, phoneNumber);
+        user.AssignRole(new Guid("00000000-0000-0000-0002-000000000002"));
 
         await userRepository.AddAsync(user, cancellationToken);
 

@@ -33,6 +33,7 @@ namespace SafeFlow.Application.Identity.Commands.Login;
 /// </remarks>
 public sealed class LoginCommandHandler(
     IReadRepository<User> userRepository,
+    IReadRepository<Role> roleRepository,
     IRepository<RefreshTokenEntity> refreshTokenRepository,
     IIdentityService identityService,
     IJwtTokenService jwtTokenService,
@@ -46,7 +47,7 @@ public sealed class LoginCommandHandler(
         LoginCommand command,
         CancellationToken cancellationToken)
     {
-        // ── 1. Look up user by email ─────────────────────────────────────────
+        // ── 1. Load user ────────────────────────────────────────────────────
         var spec = new UserByEmailSpecification(command.Email);
         var user = await userRepository.FirstOrDefaultAsync(spec, cancellationToken);
 
@@ -125,8 +126,15 @@ public sealed class LoginCommandHandler(
         user.RecordLogin();
 
         // ── 5. Issue tokens ──────────────────────────────────────────────────
-        var roles = user.UserRoles
-            .Select(ur => ur.RoleId.ToString())
+        var roleIds = user.UserRoles.Select(ur => ur.RoleId).ToList();
+        var allRoles = await roleRepository.ListAsync(new RolesWithPermissionsSpecification(), cancellationToken);
+        var userRoles = allRoles.Where(r => roleIds.Contains(r.Id)).ToList();
+
+        var roles = userRoles.Select(r => r.Name).ToList();
+        var permissions = userRoles
+            .SelectMany(r => r.RolePermissions)
+            .Select(rp => rp.Permission.CanonicalName)
+            .Distinct()
             .ToList();
 
         string accessToken = jwtTokenService.GenerateAccessToken(
@@ -135,7 +143,7 @@ public sealed class LoginCommandHandler(
             user.FullName.ToString(),
             tenantId: Guid.Empty, // Tenant enrichment happens in Infrastructure
             roles: roles,
-            permissions: []);
+            permissions: permissions);
 
         string rawRefreshToken = jwtTokenService.GenerateRefreshToken();
         string tokenHash = jwtTokenService.HashToken(rawRefreshToken);

@@ -52,6 +52,12 @@ public sealed class Permission : ValueObject
     // Constructor
     // -------------------------------------------------------------------------
 
+    private Permission()
+    {
+        Module = string.Empty;
+        Action = string.Empty;
+    }
+
     private Permission(string module, string action)
     {
         Module = module;
@@ -66,13 +72,13 @@ public sealed class Permission : ValueObject
     /// Gets the module (bounded-context or feature area) component of this permission
     /// (e.g., <c>"Users"</c>, <c>"Incidents"</c>).
     /// </summary>
-    public string Module { get; }
+    public string Module { get; private set; }
 
     /// <summary>
     /// Gets the action component of this permission
     /// (e.g., <c>"Read"</c>, <c>"Write"</c>, <c>"Delete"</c>).
     /// </summary>
-    public string Action { get; }
+    public string Action { get; private set; }
 
     /// <summary>
     /// Gets the canonical dot-separated representation of this permission

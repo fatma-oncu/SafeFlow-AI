@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using SafeFlow.Domain.Employees.Aggregates;
 using SafeFlow.Domain.Identity.Aggregates;
 using SafeFlow.Domain.Identity.Entities;
 using SafeFlow.Infrastructure.Identity;
@@ -67,6 +68,9 @@ public sealed class SafeFlowDbContext
 
     /// <summary>Gets the <see cref="RefreshToken"/> entity table.</summary>
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    /// <summary>Gets the <see cref="Employee"/> aggregate root table.</summary>
+    public DbSet<Employee> Employees => Set<Employee>();
 
     // ── EF Core configuration ─────────────────────────────────────────────────
 

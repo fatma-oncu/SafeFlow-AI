@@ -32,6 +32,7 @@ namespace SafeFlow.Application.Identity.Commands.RefreshToken;
 /// </remarks>
 public sealed class RefreshTokenCommandHandler(
     IReadRepository<User> userRepository,
+    IReadRepository<Role> roleRepository,
     IRepository<Domain.Identity.Entities.RefreshToken> refreshTokenRepository,
     IJwtTokenService jwtTokenService,
     IAuditService auditService,
@@ -121,7 +122,16 @@ public sealed class RefreshTokenCommandHandler(
         await refreshTokenRepository.AddAsync(newRefreshToken, cancellationToken);
 
         // ── 6. Issue new access token ────────────────────────────────────────
-        var roles = user.UserRoles.Select(ur => ur.RoleId.ToString()).ToList();
+        var roleIds = user.UserRoles.Select(ur => ur.RoleId).ToList();
+        var allRoles = await roleRepository.ListAsync(new RolesWithPermissionsSpecification(), cancellationToken);
+        var userRoles = allRoles.Where(r => roleIds.Contains(r.Id)).ToList();
+
+        var roles = userRoles.Select(r => r.Name).ToList();
+        var permissions = userRoles
+            .SelectMany(r => r.RolePermissions)
+            .Select(rp => rp.Permission.CanonicalName)
+            .Distinct()
+            .ToList();
 
         string accessToken = jwtTokenService.GenerateAccessToken(
             user.Id,
@@ -129,7 +139,7 @@ public sealed class RefreshTokenCommandHandler(
             user.FullName.ToString(),
             tenantId: Guid.Empty,
             roles: roles,
-            permissions: []);
+            permissions: permissions);
 
         await auditService.LogAsync(
             AuditAction.TokenRefreshed,

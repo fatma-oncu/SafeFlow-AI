@@ -57,18 +57,8 @@ public sealed class DatabaseInitializer(
             await dbContext.Database.MigrateAsync(cancellationToken);
             logger.LogInformation("EF Core migrations applied successfully.");
 
-            // ── 2. Seed roles ─────────────────────────────────────────────────
-            var roleSeeder = scope.ServiceProvider.GetRequiredService<RoleSeeder>();
-            await roleSeeder.SeedAsync(cancellationToken);
-
-            // ── 3. Seed permissions ───────────────────────────────────────────
-            var permissionSeeder = scope.ServiceProvider
-                .GetRequiredService<PermissionSeeder>();
-            await permissionSeeder.SeedAsync(cancellationToken);
-
-            // ── 4. Seed administrator ─────────────────────────────────────────
-            var adminSeeder = scope.ServiceProvider.GetRequiredService<AdminSeeder>();
-            await adminSeeder.SeedAsync(cancellationToken);
+            // ── 2. Seed data ──────────────────────────────────────────────────
+            await SeedAsync(cancellationToken);
 
             logger.LogInformation("Database initialization completed successfully.");
         }
@@ -82,5 +72,27 @@ public sealed class DatabaseInitializer(
 
             throw;
         }
+    }
+
+    /// <summary>
+    /// Seeds default roles, permissions, and administrator account without applying EF Core migrations.
+    /// Used by in-memory integration test fixtures.
+    /// </summary>
+    public async Task SeedAsync(CancellationToken cancellationToken = default)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+
+        // ── 1. Seed roles ─────────────────────────────────────────────────
+        var roleSeeder = scope.ServiceProvider.GetRequiredService<RoleSeeder>();
+        await roleSeeder.SeedAsync(cancellationToken);
+
+        // ── 2. Seed permissions ───────────────────────────────────────────
+        var permissionSeeder = scope.ServiceProvider
+            .GetRequiredService<PermissionSeeder>();
+        await permissionSeeder.SeedAsync(cancellationToken);
+
+        // ── 3. Seed administrator ─────────────────────────────────────────
+        var adminSeeder = scope.ServiceProvider.GetRequiredService<AdminSeeder>();
+        await adminSeeder.SeedAsync(cancellationToken);
     }
 }

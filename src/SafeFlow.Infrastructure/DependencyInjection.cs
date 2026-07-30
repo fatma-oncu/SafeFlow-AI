@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using SafeFlow.Application.Employees.Interfaces;
 using SafeFlow.Application.Identity.Interfaces;
 using SafeFlow.Infrastructure.Identity;
 using SafeFlow.Infrastructure.Options;
@@ -258,6 +259,9 @@ public static class DependencyInjection
 
         // File storage (local disk in Phase 1)
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
+
+        // Employee Number Generator
+        services.AddScoped<IEmployeeNumberGenerator, EmployeeNumberGenerator>();
 
         return services;
     }

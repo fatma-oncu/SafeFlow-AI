@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SafeFlow.SharedKernel.Results;
 
 /// <summary>
@@ -22,7 +24,8 @@ public sealed class PagedResult<T>
     // Constructor
     // -------------------------------------------------------------------------
 
-    private PagedResult(
+    [JsonConstructor]
+    public PagedResult(
         IReadOnlyList<T> items,
         int totalCount,
         int page,

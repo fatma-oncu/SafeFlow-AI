@@ -23,11 +23,17 @@ internal static class SystemPermissions
 {
     // ── Permission definitions ────────────────────────────────────────────────
 
-    internal static readonly Permission UsersRead   = Permission.Create("Users",   "Read");
-    internal static readonly Permission UsersWrite  = Permission.Create("Users",   "Write");
-    internal static readonly Permission RolesRead   = Permission.Create("Roles",   "Read");
-    internal static readonly Permission RolesAssign = Permission.Create("Roles",   "Assign");
-    internal static readonly Permission RolesRevoke = Permission.Create("Roles",   "Revoke");
+    internal static Permission UsersRead   => Permission.Create("Users",   "Read");
+    internal static Permission UsersWrite  => Permission.Create("Users",   "Write");
+    internal static Permission RolesRead   => Permission.Create("Roles",   "Read");
+    internal static Permission RolesAssign => Permission.Create("Roles",   "Assign");
+    internal static Permission RolesRevoke => Permission.Create("Roles",   "Revoke");
+
+    internal static Permission EmployeesRead     => Permission.Create("Employees", "Read");
+    internal static Permission EmployeesCreate   => Permission.Create("Employees", "Create");
+    internal static Permission EmployeesUpdate   => Permission.Create("Employees", "Update");
+    internal static Permission EmployeesDelete   => Permission.Create("Employees", "Delete");
+    internal static Permission EmployeesTransfer => Permission.Create("Employees", "Transfer");
 
     // ── Role-permission matrix ────────────────────────────────────────────────
 
@@ -42,6 +48,11 @@ internal static class SystemPermissions
         RolesRead,
         RolesAssign,
         RolesRevoke,
+        EmployeesRead,
+        EmployeesCreate,
+        EmployeesUpdate,
+        EmployeesDelete,
+        EmployeesTransfer,
     ];
 
     /// <summary>
@@ -55,24 +66,34 @@ internal static class SystemPermissions
         RolesRead,
         RolesAssign,
         RolesRevoke,
+        EmployeesRead,
+        EmployeesCreate,
+        EmployeesUpdate,
+        EmployeesDelete,
+        EmployeesTransfer,
     ];
 
     /// <summary>
     /// Returns all permissions assigned to the <c>Manager</c> role.
-    /// Managers can read users and roles but cannot mutate them.
+    /// Managers can read users, roles and employees, create/update/transfer employees.
     /// </summary>
     internal static IReadOnlyList<Permission> ManagerPermissions() =>
     [
         UsersRead,
         RolesRead,
+        EmployeesRead,
+        EmployeesCreate,
+        EmployeesUpdate,
+        EmployeesTransfer,
     ];
 
     /// <summary>
     /// Returns all permissions assigned to the <c>Employee</c> role.
-    /// Employees can read their own profile only.
+    /// Employees can read profiles.
     /// </summary>
     internal static IReadOnlyList<Permission> EmployeePermissions() =>
     [
         UsersRead,
+        EmployeesRead,
     ];
 }

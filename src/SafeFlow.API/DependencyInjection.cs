@@ -76,11 +76,16 @@ public static class DependencyInjection
         services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
         services.AddAuthorizationBuilder()
-            .AddPolicy(Permissions.UsersRead,   p => p.AddRequirements(new PermissionRequirement(Permissions.UsersRead)))
-            .AddPolicy(Permissions.UsersWrite,  p => p.AddRequirements(new PermissionRequirement(Permissions.UsersWrite)))
-            .AddPolicy(Permissions.RolesRead,   p => p.AddRequirements(new PermissionRequirement(Permissions.RolesRead)))
-            .AddPolicy(Permissions.RolesAssign, p => p.AddRequirements(new PermissionRequirement(Permissions.RolesAssign)))
-            .AddPolicy(Permissions.RolesRevoke, p => p.AddRequirements(new PermissionRequirement(Permissions.RolesRevoke)));
+            .AddPolicy(Permissions.UsersRead,         p => p.AddRequirements(new PermissionRequirement(Permissions.UsersRead)))
+            .AddPolicy(Permissions.UsersWrite,        p => p.AddRequirements(new PermissionRequirement(Permissions.UsersWrite)))
+            .AddPolicy(Permissions.RolesRead,         p => p.AddRequirements(new PermissionRequirement(Permissions.RolesRead)))
+            .AddPolicy(Permissions.RolesAssign,       p => p.AddRequirements(new PermissionRequirement(Permissions.RolesAssign)))
+            .AddPolicy(Permissions.RolesRevoke,       p => p.AddRequirements(new PermissionRequirement(Permissions.RolesRevoke)))
+            .AddPolicy(Permissions.EmployeesRead,     p => p.AddRequirements(new PermissionRequirement(Permissions.EmployeesRead)))
+            .AddPolicy(Permissions.EmployeesCreate,   p => p.AddRequirements(new PermissionRequirement(Permissions.EmployeesCreate)))
+            .AddPolicy(Permissions.EmployeesUpdate,   p => p.AddRequirements(new PermissionRequirement(Permissions.EmployeesUpdate)))
+            .AddPolicy(Permissions.EmployeesDelete,   p => p.AddRequirements(new PermissionRequirement(Permissions.EmployeesDelete)))
+            .AddPolicy(Permissions.EmployeesTransfer, p => p.AddRequirements(new PermissionRequirement(Permissions.EmployeesTransfer)));
 
         return services;
     }

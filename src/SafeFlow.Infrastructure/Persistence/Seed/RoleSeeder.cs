@@ -68,31 +68,47 @@ internal sealed class RoleSeeder(
 
         bool changes = false;
 
-        foreach (var role in Roles)
+        var assignments = new Dictionary<Guid, IReadOnlyList<Domain.Identity.ValueObjects.Permission>>
         {
-            if (!existingIds.Add(role.Id))
+            [SystemConstants.SuperAdminRoleId] = SystemPermissions.SuperAdminPermissions(),
+            [SystemConstants.AdminRoleId]      = SystemPermissions.AdminPermissions(),
+            [SystemConstants.ManagerRoleId]    = SystemPermissions.ManagerPermissions(),
+            [SystemConstants.EmployeeRoleId]   = SystemPermissions.EmployeePermissions(),
+        };
+
+        foreach (var roleSeed in Roles)
+        {
+            if (!existingIds.Add(roleSeed.Id))
             {
                 logger.LogDebug(
                     "Domain role '{RoleName}' already exists.",
-                    role.Name);
+                    roleSeed.Name);
 
                 continue;
             }
 
-            await dbContext.DomainRoles.AddAsync(
-                Role.Create(
-                    role.Id,
-                    role.Name,
-                    role.Description,
-                    role.IsSystemRole),
-                cancellationToken);
+            var domainRole = Role.Create(
+                roleSeed.Id,
+                roleSeed.Name,
+                roleSeed.Description,
+                roleSeed.IsSystemRole);
+
+            if (assignments.TryGetValue(domainRole.Id, out var permissions))
+            {
+                foreach (var permission in permissions)
+                {
+                    domainRole.AddPermission(permission);
+                }
+            }
+
+            await dbContext.DomainRoles.AddAsync(domainRole, cancellationToken);
 
             changes = true;
 
             logger.LogInformation(
                 "Seeded domain role '{RoleName}' ({RoleId}).",
-                role.Name,
-                role.Id);
+                roleSeed.Name,
+                roleSeed.Id);
         }
 
         if (changes)

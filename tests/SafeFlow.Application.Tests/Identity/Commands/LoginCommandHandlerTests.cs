@@ -22,6 +22,7 @@ public sealed class LoginCommandHandlerTests
     // ── Dependencies ──────────────────────────────────────────────────────────
 
     private readonly IReadRepository<User>          _userRepository     = Substitute.For<IReadRepository<User>>();
+    private readonly IReadRepository<Role>          _roleRepository     = Substitute.For<IReadRepository<Role>>();
     private readonly IRepository<RefreshToken>      _tokenRepository    = Substitute.For<IRepository<RefreshToken>>();
     private readonly IIdentityService               _identityService    = Substitute.For<IIdentityService>();
     private readonly IJwtTokenService               _jwtTokenService    = Substitute.For<IJwtTokenService>();
@@ -33,6 +34,7 @@ public sealed class LoginCommandHandlerTests
     {
         _sut = new LoginCommandHandler(
             _userRepository,
+            _roleRepository,
             _tokenRepository,
             _identityService,
             _jwtTokenService,

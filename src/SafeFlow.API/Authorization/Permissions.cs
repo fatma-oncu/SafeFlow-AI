@@ -19,4 +19,11 @@ public static class Permissions
     public const string RolesRead    = "Roles:Read";
     public const string RolesAssign  = "Roles:Assign";
     public const string RolesRevoke  = "Roles:Revoke";
+
+    // ── Employees ────────────────────────────────────────────────────────────
+    public const string EmployeesRead     = "Employees:Read";
+    public const string EmployeesCreate   = "Employees:Create";
+    public const string EmployeesUpdate   = "Employees:Update";
+    public const string EmployeesDelete   = "Employees:Delete";
+    public const string EmployeesTransfer = "Employees:Transfer";
 }

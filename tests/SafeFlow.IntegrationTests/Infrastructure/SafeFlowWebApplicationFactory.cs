@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using SafeFlow.Infrastructure.Persistence;
+using SafeFlow.Infrastructure.Persistence.Seed;
 
 namespace SafeFlow.IntegrationTests.Infrastructure;
 
@@ -59,11 +61,24 @@ public sealed class SafeFlowWebApplicationFactory : WebApplicationFactory<Progra
             services.AddDbContext<SafeFlowDbContext>(options =>
                 options.UseSqlite(_connection));
 
-            // ── Ensure schema is created ──────────────────────────────────────
-            using var scope = services.BuildServiceProvider().CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<SafeFlowDbContext>();
-            dbContext.Database.EnsureCreated();
+            // ── Add SQLite in-memory DbContext using open connection ─────────
+            services.AddDbContext<SafeFlowDbContext>(options =>
+                options.UseSqlite(_connection));
         });
+    }
+
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        var host = base.CreateHost(builder);
+
+        using var scope = host.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<SafeFlowDbContext>();
+        dbContext.Database.EnsureCreated();
+
+        var initializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
+        initializer.SeedAsync().GetAwaiter().GetResult();
+
+        return host;
     }
 
     protected override void Dispose(bool disposing)

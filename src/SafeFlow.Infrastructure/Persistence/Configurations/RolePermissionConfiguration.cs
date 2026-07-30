@@ -10,6 +10,7 @@ namespace SafeFlow.Infrastructure.Persistence.Configurations;
 /// <remarks>
 /// The <c>Permission</c> value object is mapped as an EF Core owned entity,
 /// inlining <c>Module</c> and <c>Action</c> columns directly into this table.
+/// Domain invariants (duplicate permission prevention) are enforced in <c>Role.AddPermission</c>.
 /// </remarks>
 internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermission>
 {
@@ -33,11 +34,6 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
                 .HasColumnName("PermissionAction")
                 .HasMaxLength(100)
                 .IsRequired();
-
-            // Composite unique: a role cannot hold the same permission twice
-            perm.HasIndex(p => new { p.Module, p.Action })
-                .IsUnique()
-                .HasDatabaseName("IX_RolePermissions_Module_Action");
         });
 
         // ── Audit fields ─────────────────────────────────────────────────────

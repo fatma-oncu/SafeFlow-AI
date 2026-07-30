@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SafeFlow.Domain.Identity.Aggregates;
+using SafeFlow.Domain.Identity.Entities;
 
 namespace SafeFlow.Infrastructure.Persistence.Seed;
 
@@ -44,14 +45,23 @@ internal sealed class PermissionSeeder(
             [SystemConstants.EmployeeRoleId]   = SystemPermissions.EmployeePermissions(),
         };
 
+        bool changes = false;
+
         foreach (var role in roles)
         {
             if (!assignments.TryGetValue(role.Id, out var permissions)) continue;
 
             foreach (var permission in permissions)
             {
-                // AddPermission is idempotent — silently skips duplicates
-                role.AddPermission(permission);
+                bool alreadyHas = role.RolePermissions.Any(rp =>
+                    rp.Permission.Module == permission.Module &&
+                    rp.Permission.Action == permission.Action);
+
+                if (!alreadyHas)
+                {
+                    role.AddPermission(permission);
+                    changes = true;
+                }
             }
 
             logger.LogDebug(
@@ -59,7 +69,10 @@ internal sealed class PermissionSeeder(
                 permissions.Count, role.Name);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (changes)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         logger.LogInformation("Permission seeding completed.");
     }
