@@ -1,5 +1,6 @@
 using Asp.Versioning.ApiExplorer;
 using SafeFlow.API;
+using SafeFlow.API.Extensions;
 using SafeFlow.API.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,14 @@ builder.Services.AddApi(builder.Configuration);
 
 // ── Application Build ─────────────────────────────────────────────────────────
 var app = builder.Build();
+
+// ── Database Initialization (Development only) ────────────────────────────────
+// Migrations are auto-applied in Development. In Staging/Production use:
+//   dotnet ef database update --project src/SafeFlow.Infrastructure --startup-project src/SafeFlow.API
+if (app.Environment.IsDevelopment())
+{
+    await app.InitializeDatabaseAsync();
+}
 
 // ── Middleware Pipeline ───────────────────────────────────────────────────────
 

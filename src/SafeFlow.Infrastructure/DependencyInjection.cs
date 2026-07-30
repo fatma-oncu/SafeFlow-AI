@@ -10,6 +10,7 @@ using SafeFlow.Infrastructure.Identity;
 using SafeFlow.Infrastructure.Options;
 using SafeFlow.Infrastructure.Persistence;
 using SafeFlow.Infrastructure.Persistence.Repositories;
+using SafeFlow.Infrastructure.Persistence.Seed;
 using SafeFlow.Infrastructure.Services;
 using SafeFlow.SharedKernel.Interfaces;
 using System.Security.Cryptography;
@@ -38,7 +39,8 @@ public static class DependencyInjection
             .AddJwtAuthentication(configuration)
             .AddRepositories()
             .AddApplicationServices()
-            .AddHttpContextServices();
+            .AddHttpContextServices()
+            .AddSeedServices();
 
         return services;
     }
@@ -51,6 +53,26 @@ public static class DependencyInjection
     {
         services.Configure<JwtSettings>(
             configuration.GetSection(JwtSettings.SectionName));
+
+        services.Configure<SeedSettings>(
+            configuration.GetSection(SeedSettings.SectionName));
+
+        return services;
+    }
+
+    // ── Seed services ──────────────────────────────────────────────────────────
+
+    private static IServiceCollection AddSeedServices(
+        this IServiceCollection services)
+    {
+        // Initializer is Singleton so it can be resolved from the root container
+        // without requiring an active scope at startup.
+        services.AddSingleton<DatabaseInitializer>();
+
+        // Seeders are Scoped — they depend on DbContext and Identity services.
+        services.AddScoped<RoleSeeder>();
+        services.AddScoped<PermissionSeeder>();
+        services.AddScoped<AdminSeeder>();
 
         return services;
     }
@@ -123,16 +145,27 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 $"Configuration section '{JwtSettings.SectionName}' is missing.");
 
-        // Build RSA public key from the private key PEM for token validation
-        // (the public key is derived — no separate public-key file required)
-        RsaSecurityKey? validationKey = null;
-
-        if (!string.IsNullOrWhiteSpace(jwtSettings.RsaPrivateKeyPem))
+        // ── Fail fast if the RSA key is absent ────────────────────────────────
+        // A missing key must never silently disable signature validation.
+        // JwtTokenService applies the same guard in its constructor.
+        if (string.IsNullOrWhiteSpace(jwtSettings.RsaPrivateKeyPem))
         {
-            var rsa = RSA.Create();
-            rsa.ImportFromPem(jwtSettings.RsaPrivateKeyPem.AsSpan());
-            validationKey = new RsaSecurityKey(rsa);
+            throw new InvalidOperationException(
+                "JWT RSA private key is not configured. " +
+                "Set 'JwtSettings:RsaPrivateKeyPem' via dotnet user-secrets, " +
+                "environment variable, or Key Vault before starting the application.");
         }
+
+        // Extract the public-key parameters for token validation.
+        // Using-block ensures the RSA object is disposed immediately after setup.
+        RSAParameters rsaPublicParams;
+        using (var rsa = RSA.Create())
+        {
+            rsa.ImportFromPem(jwtSettings.RsaPrivateKeyPem.AsSpan());
+            rsaPublicParams = rsa.ExportParameters(includePrivateParameters: false);
+        }
+
+        var validationKey = new RsaSecurityKey(RSA.Create(rsaPublicParams));
 
         services
             .AddAuthentication(options =>
@@ -153,7 +186,7 @@ public static class DependencyInjection
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.Zero,
 
-                    ValidateIssuerSigningKey = validationKey is not null,
+                    ValidateIssuerSigningKey = true,          // always true — key is guaranteed
                     IssuerSigningKey = validationKey,
 
                     // RS256 algorithm
@@ -208,7 +241,7 @@ public static class DependencyInjection
         services.AddScoped<IIdentityService, IdentityService>();
 
         // JWT token operations
-        services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         // Audit (ILogger-backed in Phase 1)
         services.AddScoped<IAuditService, AuditService>();
