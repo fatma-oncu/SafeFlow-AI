@@ -34,4 +34,14 @@ public static class Permissions
     public const string RiskDelete  = "Risk:Delete";
     public const string RiskArchive = "Risk:Archive";
     public const string RiskApprove = "Risk:Approve";
+
+    // ── Incidents ────────────────────────────────────────────────────────────
+    public const string IncidentRead        = "Incident:Read";
+    public const string IncidentCreate      = "Incident:Create";
+    public const string IncidentUpdate      = "Incident:Update";
+    public const string IncidentDelete      = "Incident:Delete";
+    public const string IncidentAssign      = "Incident:Assign";
+    public const string IncidentInvestigate = "Incident:Investigate";
+    public const string IncidentResolve     = "Incident:Resolve";
+    public const string IncidentClose       = "Incident:Close";
 }

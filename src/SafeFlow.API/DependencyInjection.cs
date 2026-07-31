@@ -91,7 +91,15 @@ public static class DependencyInjection
             .AddPolicy(Permissions.RiskUpdate,        p => p.AddRequirements(new PermissionRequirement(Permissions.RiskUpdate)))
             .AddPolicy(Permissions.RiskDelete,        p => p.AddRequirements(new PermissionRequirement(Permissions.RiskDelete)))
             .AddPolicy(Permissions.RiskArchive,       p => p.AddRequirements(new PermissionRequirement(Permissions.RiskArchive)))
-            .AddPolicy(Permissions.RiskApprove,       p => p.AddRequirements(new PermissionRequirement(Permissions.RiskApprove)));
+            .AddPolicy(Permissions.RiskApprove,       p => p.AddRequirements(new PermissionRequirement(Permissions.RiskApprove)))
+            .AddPolicy(Permissions.IncidentRead,        p => p.AddRequirements(new PermissionRequirement(Permissions.IncidentRead)))
+            .AddPolicy(Permissions.IncidentCreate,      p => p.AddRequirements(new PermissionRequirement(Permissions.IncidentCreate)))
+            .AddPolicy(Permissions.IncidentUpdate,      p => p.AddRequirements(new PermissionRequirement(Permissions.IncidentUpdate)))
+            .AddPolicy(Permissions.IncidentDelete,      p => p.AddRequirements(new PermissionRequirement(Permissions.IncidentDelete)))
+            .AddPolicy(Permissions.IncidentAssign,      p => p.AddRequirements(new PermissionRequirement(Permissions.IncidentAssign)))
+            .AddPolicy(Permissions.IncidentInvestigate, p => p.AddRequirements(new PermissionRequirement(Permissions.IncidentInvestigate)))
+            .AddPolicy(Permissions.IncidentResolve,     p => p.AddRequirements(new PermissionRequirement(Permissions.IncidentResolve)))
+            .AddPolicy(Permissions.IncidentClose,       p => p.AddRequirements(new PermissionRequirement(Permissions.IncidentClose)));
 
         return services;
     }

@@ -42,6 +42,15 @@ internal static class SystemPermissions
     internal static Permission RiskArchive => Permission.Create("Risk", "Archive");
     internal static Permission RiskApprove => Permission.Create("Risk", "Approve");
 
+    internal static Permission IncidentRead        => Permission.Create("Incident", "Read");
+    internal static Permission IncidentCreate      => Permission.Create("Incident", "Create");
+    internal static Permission IncidentUpdate      => Permission.Create("Incident", "Update");
+    internal static Permission IncidentDelete      => Permission.Create("Incident", "Delete");
+    internal static Permission IncidentAssign      => Permission.Create("Incident", "Assign");
+    internal static Permission IncidentInvestigate => Permission.Create("Incident", "Investigate");
+    internal static Permission IncidentResolve     => Permission.Create("Incident", "Resolve");
+    internal static Permission IncidentClose       => Permission.Create("Incident", "Close");
+
     // ── Role-permission matrix ────────────────────────────────────────────────
 
     /// <summary>
@@ -66,6 +75,14 @@ internal static class SystemPermissions
         RiskDelete,
         RiskArchive,
         RiskApprove,
+        IncidentRead,
+        IncidentCreate,
+        IncidentUpdate,
+        IncidentDelete,
+        IncidentAssign,
+        IncidentInvestigate,
+        IncidentResolve,
+        IncidentClose,
     ];
 
     /// <summary>
@@ -90,11 +107,19 @@ internal static class SystemPermissions
         RiskDelete,
         RiskArchive,
         RiskApprove,
+        IncidentRead,
+        IncidentCreate,
+        IncidentUpdate,
+        IncidentDelete,
+        IncidentAssign,
+        IncidentInvestigate,
+        IncidentResolve,
+        IncidentClose,
     ];
 
     /// <summary>
     /// Returns all permissions assigned to the <c>Manager</c> role.
-    /// Managers can read users, roles and employees, create/update/transfer employees, and manage risk assessments.
+    /// Managers can read users, roles and employees, create/update/transfer employees, and manage risk assessments and incidents.
     /// </summary>
     internal static IReadOnlyList<Permission> ManagerPermissions() =>
     [
@@ -109,16 +134,26 @@ internal static class SystemPermissions
         RiskUpdate,
         RiskArchive,
         RiskApprove,
+        IncidentRead,
+        IncidentCreate,
+        IncidentUpdate,
+        IncidentAssign,
+        IncidentInvestigate,
+        IncidentResolve,
+        IncidentClose,
     ];
 
     /// <summary>
-    /// Returns all permissions assigned to the <c>Employee</c> role.
-    /// Employees can read profiles and risk assessments.
+    /// Returns all permissions assigned to the standard <c>User</c> role.
+    /// Standard users have read-only access to employees, risk assessments, and incidents.
     /// </summary>
-    internal static IReadOnlyList<Permission> EmployeePermissions() =>
+    internal static IReadOnlyList<Permission> UserPermissions() =>
     [
-        UsersRead,
         EmployeesRead,
         RiskRead,
+        IncidentRead,
+        IncidentCreate,
     ];
+
+    internal static IReadOnlyList<Permission> EmployeePermissions() => UserPermissions();
 }
