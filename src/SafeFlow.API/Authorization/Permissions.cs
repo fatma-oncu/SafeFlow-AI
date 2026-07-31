@@ -26,4 +26,12 @@ public static class Permissions
     public const string EmployeesUpdate   = "Employees:Update";
     public const string EmployeesDelete   = "Employees:Delete";
     public const string EmployeesTransfer = "Employees:Transfer";
+
+    // ── Risk Assessments ─────────────────────────────────────────────────────
+    public const string RiskRead    = "Risk:Read";
+    public const string RiskCreate  = "Risk:Create";
+    public const string RiskUpdate  = "Risk:Update";
+    public const string RiskDelete  = "Risk:Delete";
+    public const string RiskArchive = "Risk:Archive";
+    public const string RiskApprove = "Risk:Approve";
 }

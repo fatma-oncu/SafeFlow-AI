@@ -61,8 +61,8 @@ public sealed class GlobalExceptionMiddleware
     {
         var (status, title, code) = ClassifyException(exception);
 
-        // In development expose a short detail; in production use a generic message.
-        string detail = _env.IsDevelopment()
+        // In development or for validation exceptions expose detail message.
+        string detail = (_env.IsDevelopment() || exception is SafeFlow.SharedKernel.Exceptions.ValidationException)
             ? exception.Message
             : "An unexpected error occurred. Please try again later.";
 
@@ -75,6 +75,11 @@ public sealed class GlobalExceptionMiddleware
             Instance = context.Request.Path,
             Extensions = { ["errorCode"] = code },
         };
+
+        if (exception is SafeFlow.SharedKernel.Exceptions.ValidationException valEx)
+        {
+            problem.Extensions["errors"] = valEx.Errors;
+        }
 
         context.Response.StatusCode  = status;
         context.Response.ContentType = "application/problem+json";
@@ -89,9 +94,10 @@ public sealed class GlobalExceptionMiddleware
     private static (int Status, string Title, string Code) ClassifyException(Exception ex) =>
         ex switch
         {
-            BadHttpRequestException bhr => (bhr.StatusCode, "Bad Request", "Request.Invalid"),
-            ArgumentException           => (400, "Bad Request", "Request.Argument"),
-            UnauthorizedAccessException => (401, "Unauthorized", "Auth.Unauthorized"),
-            _                           => (500, "Internal Server Error", "Server.Error"),
+            BadHttpRequestException bhr                          => (bhr.StatusCode, "Bad Request", "Request.Invalid"),
+            SafeFlow.SharedKernel.Exceptions.ValidationException => (400, "Bad Request", "Validation.Error"),
+            ArgumentException                                    => (400, "Bad Request", "Request.Argument"),
+            UnauthorizedAccessException                          => (401, "Unauthorized", "Auth.Unauthorized"),
+            _                                                    => (500, "Internal Server Error", "Server.Error"),
         };
 }

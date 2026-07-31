@@ -85,7 +85,13 @@ public static class DependencyInjection
             .AddPolicy(Permissions.EmployeesCreate,   p => p.AddRequirements(new PermissionRequirement(Permissions.EmployeesCreate)))
             .AddPolicy(Permissions.EmployeesUpdate,   p => p.AddRequirements(new PermissionRequirement(Permissions.EmployeesUpdate)))
             .AddPolicy(Permissions.EmployeesDelete,   p => p.AddRequirements(new PermissionRequirement(Permissions.EmployeesDelete)))
-            .AddPolicy(Permissions.EmployeesTransfer, p => p.AddRequirements(new PermissionRequirement(Permissions.EmployeesTransfer)));
+            .AddPolicy(Permissions.EmployeesTransfer, p => p.AddRequirements(new PermissionRequirement(Permissions.EmployeesTransfer)))
+            .AddPolicy(Permissions.RiskRead,          p => p.AddRequirements(new PermissionRequirement(Permissions.RiskRead)))
+            .AddPolicy(Permissions.RiskCreate,        p => p.AddRequirements(new PermissionRequirement(Permissions.RiskCreate)))
+            .AddPolicy(Permissions.RiskUpdate,        p => p.AddRequirements(new PermissionRequirement(Permissions.RiskUpdate)))
+            .AddPolicy(Permissions.RiskDelete,        p => p.AddRequirements(new PermissionRequirement(Permissions.RiskDelete)))
+            .AddPolicy(Permissions.RiskArchive,       p => p.AddRequirements(new PermissionRequirement(Permissions.RiskArchive)))
+            .AddPolicy(Permissions.RiskApprove,       p => p.AddRequirements(new PermissionRequirement(Permissions.RiskApprove)));
 
         return services;
     }

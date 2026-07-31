@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using SafeFlow.Application.Employees.Interfaces;
 using SafeFlow.Application.Identity.Interfaces;
+using SafeFlow.Application.RiskAssessments.Interfaces;
 using SafeFlow.Infrastructure.Identity;
 using SafeFlow.Infrastructure.Options;
 using SafeFlow.Infrastructure.Persistence;
@@ -262,6 +263,9 @@ public static class DependencyInjection
 
         // Employee Number Generator
         services.AddScoped<IEmployeeNumberGenerator, EmployeeNumberGenerator>();
+
+        // Risk Assessment Number Generator
+        services.AddScoped<IRiskAssessmentNumberGenerator, RiskAssessmentNumberGenerator>();
 
         return services;
     }

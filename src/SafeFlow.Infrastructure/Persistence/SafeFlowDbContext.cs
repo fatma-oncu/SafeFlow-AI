@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SafeFlow.Domain.Employees.Aggregates;
 using SafeFlow.Domain.Identity.Aggregates;
 using SafeFlow.Domain.Identity.Entities;
+using SafeFlow.Domain.RiskAssessments.Aggregates;
 using SafeFlow.Infrastructure.Identity;
 using SafeFlow.Infrastructure.Persistence.Configurations;
 using SafeFlow.SharedKernel.Entities;
@@ -71,6 +72,9 @@ public sealed class SafeFlowDbContext
 
     /// <summary>Gets the <see cref="Employee"/> aggregate root table.</summary>
     public DbSet<Employee> Employees => Set<Employee>();
+
+    /// <summary>Gets the <see cref="RiskAssessment"/> aggregate root table.</summary>
+    public DbSet<RiskAssessment> RiskAssessments => Set<RiskAssessment>();
 
     // ── EF Core configuration ─────────────────────────────────────────────────
 

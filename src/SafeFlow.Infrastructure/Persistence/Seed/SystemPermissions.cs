@@ -35,6 +35,13 @@ internal static class SystemPermissions
     internal static Permission EmployeesDelete   => Permission.Create("Employees", "Delete");
     internal static Permission EmployeesTransfer => Permission.Create("Employees", "Transfer");
 
+    internal static Permission RiskRead    => Permission.Create("Risk", "Read");
+    internal static Permission RiskCreate  => Permission.Create("Risk", "Create");
+    internal static Permission RiskUpdate  => Permission.Create("Risk", "Update");
+    internal static Permission RiskDelete  => Permission.Create("Risk", "Delete");
+    internal static Permission RiskArchive => Permission.Create("Risk", "Archive");
+    internal static Permission RiskApprove => Permission.Create("Risk", "Approve");
+
     // ── Role-permission matrix ────────────────────────────────────────────────
 
     /// <summary>
@@ -53,6 +60,12 @@ internal static class SystemPermissions
         EmployeesUpdate,
         EmployeesDelete,
         EmployeesTransfer,
+        RiskRead,
+        RiskCreate,
+        RiskUpdate,
+        RiskDelete,
+        RiskArchive,
+        RiskApprove,
     ];
 
     /// <summary>
@@ -71,11 +84,17 @@ internal static class SystemPermissions
         EmployeesUpdate,
         EmployeesDelete,
         EmployeesTransfer,
+        RiskRead,
+        RiskCreate,
+        RiskUpdate,
+        RiskDelete,
+        RiskArchive,
+        RiskApprove,
     ];
 
     /// <summary>
     /// Returns all permissions assigned to the <c>Manager</c> role.
-    /// Managers can read users, roles and employees, create/update/transfer employees.
+    /// Managers can read users, roles and employees, create/update/transfer employees, and manage risk assessments.
     /// </summary>
     internal static IReadOnlyList<Permission> ManagerPermissions() =>
     [
@@ -85,15 +104,21 @@ internal static class SystemPermissions
         EmployeesCreate,
         EmployeesUpdate,
         EmployeesTransfer,
+        RiskRead,
+        RiskCreate,
+        RiskUpdate,
+        RiskArchive,
+        RiskApprove,
     ];
 
     /// <summary>
     /// Returns all permissions assigned to the <c>Employee</c> role.
-    /// Employees can read profiles.
+    /// Employees can read profiles and risk assessments.
     /// </summary>
     internal static IReadOnlyList<Permission> EmployeePermissions() =>
     [
         UsersRead,
         EmployeesRead,
+        RiskRead,
     ];
 }
