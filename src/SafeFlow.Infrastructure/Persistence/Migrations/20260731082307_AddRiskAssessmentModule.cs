@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -18,16 +18,6 @@ namespace SafeFlow.Infrastructure.Persistence.Migrations
 
             migrationBuilder.EnsureSchema(
                 name: "risk");
-
-            migrationBuilder.AlterColumn<byte[]>(
-                name: "RowVersion",
-                schema: "employee",
-                table: "Employees",
-                type: "varbinary(max)",
-                nullable: false,
-                oldClrType: typeof(byte[]),
-                oldType: "rowversion",
-                oldRowVersion: true);
 
             migrationBuilder.CreateTable(
                 name: "RiskAssessments",
@@ -270,16 +260,6 @@ namespace SafeFlow.Infrastructure.Persistence.Migrations
             migrationBuilder.DropTable(
                 name: "RiskAssessments",
                 schema: "risk");
-
-            migrationBuilder.AlterColumn<byte[]>(
-                name: "RowVersion",
-                schema: "employee",
-                table: "Employees",
-                type: "rowversion",
-                rowVersion: true,
-                nullable: false,
-                oldClrType: typeof(byte[]),
-                oldType: "varbinary(max)");
 
             migrationBuilder.CreateIndex(
                 name: "IX_RolePermissions_Module_Action",

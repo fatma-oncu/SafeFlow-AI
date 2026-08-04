@@ -17,6 +17,7 @@ using SafeFlow.Infrastructure.Persistence.Seed;
 using SafeFlow.Infrastructure.Services;
 using SafeFlow.SharedKernel.Interfaces;
 using System.Security.Cryptography;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace SafeFlow.Infrastructure;
 
@@ -97,7 +98,8 @@ public static class DependencyInjection
                         maxRetryCount: 5,
                         maxRetryDelay: TimeSpan.FromSeconds(30),
                         errorNumbersToAdd: null);
-                });
+                })
+                .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
         });
 
         // Domain event dispatcher — wraps IDomainEvent → INotification for MediatR
@@ -148,74 +150,79 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 $"Configuration section '{JwtSettings.SectionName}' is missing.");
 
-        // ── Fail fast if the RSA key is absent ────────────────────────────────
-        // A missing key must never silently disable signature validation.
-        // JwtTokenService applies the same guard in its constructor.
-        if (string.IsNullOrWhiteSpace(jwtSettings.RsaPrivateKeyPem))
+       // ── Fail fast if the RSA key is absent ────────────────────────────────
+if (string.IsNullOrWhiteSpace(jwtSettings.RsaPrivateKeyPem))
+{
+    throw new InvalidOperationException(
+        "JWT RSA private key is not configured. " +
+        "Set 'JwtSettings:RsaPrivateKeyPem' via dotnet user-secrets, " +
+        "environment variable, or Key Vault before starting the application.");
+}
+
+// Extract the public-key parameters for token validation.
+string privateKeyPem = jwtSettings.RsaPrivateKeyPem
+    .Replace("\\r\\n", "\n")
+    .Replace("\\n", "\n")
+    .Trim();
+
+RSAParameters rsaPublicParams;
+
+using (var rsa = RSA.Create())
+{
+    rsa.ImportFromPem(privateKeyPem.AsSpan());
+    rsaPublicParams = rsa.ExportParameters(false);
+}
+
+// Create a new RSA instance containing only the public key for validationKey
+var validationRsa = RSA.Create();
+validationRsa.ImportParameters(rsaPublicParams);
+
+var validationKey = new RsaSecurityKey(validationRsa);
+
+services
+    .AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            throw new InvalidOperationException(
-                "JWT RSA private key is not configured. " +
-                "Set 'JwtSettings:RsaPrivateKeyPem' via dotnet user-secrets, " +
-                "environment variable, or Key Vault before starting the application.");
-        }
+            ValidateIssuer = true,
+            ValidIssuer = jwtSettings.Issuer,
 
-        // Extract the public-key parameters for token validation.
-        // Using-block ensures the RSA object is disposed immediately after setup.
-        RSAParameters rsaPublicParams;
-        using (var rsa = RSA.Create())
+            ValidateAudience = true,
+            ValidAudience = jwtSettings.Audience,
+
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero,
+
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = validationKey,
+
+            ValidAlgorithms = [SecurityAlgorithms.RsaSha256],
+        };
+
+        options.Events = new JwtBearerEvents
         {
-            rsa.ImportFromPem(jwtSettings.RsaPrivateKeyPem.AsSpan());
-            rsaPublicParams = rsa.ExportParameters(includePrivateParameters: false);
-        }
-
-        var validationKey = new RsaSecurityKey(RSA.Create(rsaPublicParams));
-
-        services
-            .AddAuthentication(options =>
+            OnChallenge = ctx =>
             {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-            .AddJwtBearer(options =>
+                ctx.HandleResponse();
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                ctx.Response.ContentType = "application/json";
+                return ctx.Response.WriteAsync(
+                    """{"error":"Unauthorized","message":"Token is missing or invalid."}""");
+            },
+            OnForbidden = ctx =>
             {
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidIssuer = jwtSettings.Issuer,
-
-                    ValidateAudience = true,
-                    ValidAudience = jwtSettings.Audience,
-
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.Zero,
-
-                    ValidateIssuerSigningKey = true,          // always true — key is guaranteed
-                    IssuerSigningKey = validationKey,
-
-                    // RS256 algorithm
-                    ValidAlgorithms = [SecurityAlgorithms.RsaSha256],
-                };
-
-                options.Events = new JwtBearerEvents
-                {
-                    OnChallenge = ctx =>
-                    {
-                        // Suppress default redirect for API requests
-                        ctx.HandleResponse();
-                        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                        ctx.Response.ContentType = "application/json";
-                        return ctx.Response.WriteAsync(
-                            """{"error":"Unauthorized","message":"Token is missing or invalid."}""");
-                    },
-                    OnForbidden = ctx =>
-                    {
-                        ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
-                        ctx.Response.ContentType = "application/json";
-                        return ctx.Response.WriteAsync(
-                            """{"error":"Forbidden","message":"You do not have permission to perform this action."}""");
-                    },
-                };
-            });
+                ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                ctx.Response.ContentType = "application/json";
+                return ctx.Response.WriteAsync(
+                    """{"error":"Forbidden","message":"You do not have permission to perform this action."}""");
+            },
+        };
+    });
 
         return services;
     }

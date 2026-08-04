@@ -5,6 +5,9 @@ using SafeFlow.API.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load User Secrets explicitly if present
+builder.Configuration.AddUserSecrets<Program>(optional: true);
+
 // ── Service Registration ──────────────────────────────────────────────────────
 builder.Services.AddApi(builder.Configuration);
 

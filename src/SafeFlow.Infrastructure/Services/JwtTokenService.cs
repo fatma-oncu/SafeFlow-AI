@@ -82,7 +82,8 @@ internal sealed class JwtTokenService : IJwtTokenService
         claims.AddRange(permissions.Select(p => new Claim("permission", p)));
 
         using var tempRsa = RSA.Create();
-        tempRsa.ImportFromPem(_settings.RsaPrivateKeyPem.AsSpan());
+        string privateKeyPem = _settings.RsaPrivateKeyPem.Replace("\\n", "\n").Replace("\\r\\n", "\n").Trim();
+        tempRsa.ImportFromPem(privateKeyPem.AsSpan());
         var rsaParams = tempRsa.ExportParameters(includePrivateParameters: true);
         var signingKey = new RsaSecurityKey(rsaParams);
         var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.RsaSha256);

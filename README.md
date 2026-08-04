@@ -40,17 +40,74 @@ SafeFlow.sln
 
 ---
 
-## 3. Development Prerequisites
+## 3. Development Prerequisites & Environment
 
 To develop, build, and run the backend solution, ensure you have:
 
 1.  **SDK:** [.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) (or higher) installed on your system.
-2.  **IDE:** Visual Studio 2022 (v17.12+), JetBrains Rider, or VS Code with C# Dev Kit.
-3.  **Database:** A local SQL Server instance or a Docker engine to run SQL Server 2022.
+2.  **Container Runtime:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) or Docker Engine supporting Docker Compose v2.
+3.  **IDE:** Visual Studio 2022 (v17.12+), JetBrains Rider, or VS Code with C# Dev Kit.
 
 ---
 
-## 4. Build and Run Instructions
+## 4. Environment Configuration & Docker Setup
+
+Before starting the containers or running the Web API:
+
+1.  **Environment File (.env):**
+    Copy `.env.example` to `.env` in the repository root and fill in your real values:
+    ```powershell
+    Copy-Item .env.example .env
+    ```
+    > ⚠️ **Never commit `.env` to Git.** It contains secrets and is excluded via `.gitignore`.
+    > Open `.env.example` for a description of every required variable.
+
+2.  **Start Docker Infrastructure:**
+    Start SQL Server 2022 and SafeFlow API in detached mode:
+    ```powershell
+    docker compose up -d
+    ```
+    *This starts `safeflow-sqlserver` on port `1433` with health checks, and `safeflow-api` on port `5000`.*
+
+3.  **View Container Logs:**
+    ```powershell
+    docker compose logs -f
+    ```
+
+4.  **Stop Docker Infrastructure:**
+    ```powershell
+    docker compose down
+    ```
+
+5.  **Swagger UI (OpenAPI):**
+    Once the API is running, access the interactive documentation at:
+    ```
+    http://localhost:5000/swagger
+    ```
+
+6.  **Health Endpoint:**
+    ```
+    http://localhost:5000/health
+    ```
+
+### Local Development (`dotnet run`) — User Secrets
+
+When running outside Docker, use [.NET User Secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets) instead of `.env`:
+
+```powershell
+# From the repository root
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost,1433;Database=SafeFlowDb;User Id=sa;Password=<your-sa-password>;TrustServerCertificate=True" --project src/SafeFlow.API
+dotnet user-secrets set "SeedSettings:AdminEmail" "admin@example.com" --project src/SafeFlow.API
+dotnet user-secrets set "SeedSettings:AdminPassword" "<YourStrongPassword>" --project src/SafeFlow.API
+dotnet user-secrets set "JwtSettings:RsaPrivateKeyPem" "$(Get-Content private.pem -Raw)" --project src/SafeFlow.API
+dotnet user-secrets set "JwtSettings:RsaPublicKeyPem" "$(Get-Content public.pem -Raw)" --project src/SafeFlow.API
+```
+
+> User Secrets are stored in your user profile (`%APPDATA%\Microsoft\UserSecrets`) and are **never committed to Git**.
+
+---
+
+## 5. Build, Database Migration & Run Instructions
 
 Execute the following commands from the repository root:
 
@@ -62,18 +119,22 @@ Execute the following commands from the repository root:
     ```powershell
     dotnet test SafeFlow.sln
     ```
-*   **Run the Web API Application:**
+*   **Apply EF Core Migrations (Host Execution):**
+    ```powershell
+    dotnet ef database update --project src/SafeFlow.Infrastructure/SafeFlow.Infrastructure.csproj --startup-project src/SafeFlow.API/SafeFlow.API.csproj
+    ```
+*   **Run the Web API Application (Host Execution):**
     ```powershell
     dotnet run --project src/SafeFlow.API/SafeFlow.API.csproj
     ```
 
 ---
 
-## 5. Documentation
+## 6. Documentation
 
 For detailed specifications, refer to the documentation in the `/docs` folder:
-*   [Product Vision](file:///c:/Users/drmus/Desktop/SafeFlow-AI/docs/product-vision.md)
-*   [C4 Architecture Diagrams](file:///c:/Users/drmus/Desktop/SafeFlow-AI/docs/c4-architecture.md)
-*   [Domain Bounded Contexts Map](file:///c:/Users/drmus/Desktop/SafeFlow-AI/docs/domain-model.md)
-*   [API Resource Contracts Specification](file:///c:/Users/drmus/Desktop/SafeFlow-AI/docs/api-specification.md)
-*   [Error Handling & Validation Guidelines](file:///c:/Users/drmus/Desktop/SafeFlow-AI/docs/error-handling-strategy.md)
+*   [Product Vision](docs/product-vision.md)
+*   [C4 Architecture Diagrams](docs/c4-architecture.md)
+*   [Domain Bounded Contexts Map](docs/domain-model.md)
+*   [API Resource Contracts Specification](docs/api-specification.md)
+*   [Error Handling & Validation Guidelines](docs/error-handling-strategy.md)

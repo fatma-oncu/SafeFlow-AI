@@ -64,13 +64,10 @@ public sealed class DatabaseInitializer(
         }
         catch (Exception ex)
         {
-            logger.LogCritical(
+            logger.LogWarning(
                 ex,
-                "Database initialization failed. " +
-                "Application startup will be aborted. " +
-                "Resolve the issue and restart the application.");
-
-            throw;
+                "Database initialization skipped because database server could not be reached. " +
+                "Verify SQL Server connection string and service status.");
         }
     }
 

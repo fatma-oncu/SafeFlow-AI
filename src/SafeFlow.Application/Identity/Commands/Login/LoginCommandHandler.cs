@@ -1,5 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
 using MediatR;
 using Microsoft.Extensions.Logging;
+
 using SafeFlow.Application.Identity.Commands.RegisterUser;
 using SafeFlow.Application.Identity.DTOs;
 using SafeFlow.Application.Identity.Interfaces;
@@ -8,6 +15,7 @@ using SafeFlow.Domain.Identity.Aggregates;
 using SafeFlow.SharedKernel.Interfaces;
 using SafeFlow.SharedKernel.Results;
 using SafeFlow.SharedKernel.Specifications;
+
 using RefreshTokenEntity = SafeFlow.Domain.Identity.Entities.RefreshToken;
 
 namespace SafeFlow.Application.Identity.Commands.Login;
@@ -31,29 +39,74 @@ namespace SafeFlow.Application.Identity.Commands.Login;
 /// email enumeration and timing-based username discovery (OWASP A07:2021).
 /// </para>
 /// </remarks>
-public sealed class LoginCommandHandler(
-    IReadRepository<User> userRepository,
-    IReadRepository<Role> roleRepository,
-    IRepository<RefreshTokenEntity> refreshTokenRepository,
-    IIdentityService identityService,
-    IJwtTokenService jwtTokenService,
-    IAuditService auditService,
-    IUnitOfWork unitOfWork,
-    ILogger<LoginCommandHandler> logger)
-    : IRequestHandler<LoginCommand, Result<LoginResponseDto>>
+public sealed partial class LoginCommandHandler : IRequestHandler<LoginCommand, Result<LoginResponseDto>>
 {
+    private readonly IReadRepository<User> _userRepository;
+    private readonly IReadRepository<Role> _roleRepository;
+    private readonly IRepository<RefreshTokenEntity> _refreshTokenRepository;
+    private readonly IIdentityService _identityService;
+    private readonly IJwtTokenService _jwtTokenService;
+    private readonly IAuditService _auditService;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IDateTimeService? _dateTimeService;
+    private readonly ILogger<LoginCommandHandler> _logger;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LoginCommandHandler"/> class.
+    /// Preserves the public API of the handler.
+    /// </summary>
+    public LoginCommandHandler(
+        IReadRepository<User> userRepository,
+        IReadRepository<Role> roleRepository,
+        IRepository<RefreshTokenEntity> refreshTokenRepository,
+        IIdentityService identityService,
+        IJwtTokenService jwtTokenService,
+        IAuditService auditService,
+        IUnitOfWork unitOfWork,
+        ILogger<LoginCommandHandler> logger)
+        : this(userRepository, roleRepository, refreshTokenRepository, identityService, jwtTokenService, auditService, unitOfWork, logger, null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LoginCommandHandler"/> class with <see cref="IDateTimeService"/>.
+    /// </summary>
+    public LoginCommandHandler(
+        IReadRepository<User> userRepository,
+        IReadRepository<Role> roleRepository,
+        IRepository<RefreshTokenEntity> refreshTokenRepository,
+        IIdentityService identityService,
+        IJwtTokenService jwtTokenService,
+        IAuditService auditService,
+        IUnitOfWork unitOfWork,
+        ILogger<LoginCommandHandler> logger,
+        IDateTimeService? dateTimeService)
+    {
+        _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+        _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
+        _refreshTokenRepository = refreshTokenRepository ?? throw new ArgumentNullException(nameof(refreshTokenRepository));
+        _identityService = identityService ?? throw new ArgumentNullException(nameof(identityService));
+        _jwtTokenService = jwtTokenService ?? throw new ArgumentNullException(nameof(jwtTokenService));
+        _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
+        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _dateTimeService = dateTimeService;
+    }
+
     /// <inheritdoc/>
     public async Task<Result<LoginResponseDto>> Handle(
         LoginCommand command,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(command);
+
         // ── 1. Load user ────────────────────────────────────────────────────
         var spec = new UserByEmailSpecification(command.Email);
-        var user = await userRepository.FirstOrDefaultAsync(spec, cancellationToken);
+        var user = await _userRepository.FirstOrDefaultAsync(spec, cancellationToken);
 
         if (user is null)
         {
-            await auditService.LogAsync(
+            await _auditService.LogAsync(
                 AuditAction.LoginFailed,
                 isSuccess: false,
                 ipAddress: command.IpAddress,
@@ -69,7 +122,7 @@ public sealed class LoginCommandHandler(
         // ── 2. Guard: active & unlocked ─────────────────────────────────────
         if (user.IsLocked)
         {
-            await auditService.LogAsync(
+            await _auditService.LogAsync(
                 AuditAction.LoginFailed,
                 isSuccess: false,
                 ipAddress: command.IpAddress,
@@ -84,7 +137,7 @@ public sealed class LoginCommandHandler(
 
         if (!user.IsActive)
         {
-            await auditService.LogAsync(
+            await _auditService.LogAsync(
                 AuditAction.LoginFailed,
                 isSuccess: false,
                 ipAddress: command.IpAddress,
@@ -98,18 +151,24 @@ public sealed class LoginCommandHandler(
         }
 
         // ── 3. Validate credentials ──────────────────────────────────────────
-        var credResult = await identityService.ValidateCredentialsAsync(
+        var credResult = await _identityService.ValidateCredentialsAsync(
             command.Email, command.Password, cancellationToken);
 
-        if (credResult.IsFailure || !credResult.Value)
+        if (credResult.IsFailure)
+        {
+            // Identity service failure is an exceptional infrastructure condition;
+            // return the direct error to caller rather than locking user out.
+            return Result.Failure<LoginResponseDto>(credResult.Error);
+        }
+
+        if (!credResult.Value)
         {
             // Always lock on any failure — domain method is idempotent (already-locked no-op)
             // Per architecture: lock after failed validation attempt (max attempts managed by Identity lockout config)
             user.Lock("Geçersiz kimlik bilgisi girişi.");
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-
-            await auditService.LogAsync(
+            await _auditService.LogAsync(
                 AuditAction.LoginFailed,
                 isSuccess: false,
                 ipAddress: command.IpAddress,
@@ -127,8 +186,18 @@ public sealed class LoginCommandHandler(
 
         // ── 5. Issue tokens ──────────────────────────────────────────────────
         var roleIds = user.UserRoles.Select(ur => ur.RoleId).ToList();
-        var allRoles = await roleRepository.ListAsync(new RolesWithPermissionsSpecification(), cancellationToken);
-        var userRoles = allRoles.Where(r => roleIds.Contains(r.Id)).ToList();
+        IReadOnlyList<Role> userRoles;
+
+        if (roleIds.Count == 0)
+        {
+            userRoles = Array.Empty<Role>();
+        }
+        else
+        {
+            userRoles = await _roleRepository.ListAsync(
+                new RolesByIdsWithPermissionsSpecification(roleIds),
+                cancellationToken);
+        }
 
         var roles = userRoles.Select(r => r.Name).ToList();
         var permissions = userRoles
@@ -137,7 +206,7 @@ public sealed class LoginCommandHandler(
             .Distinct()
             .ToList();
 
-        string accessToken = jwtTokenService.GenerateAccessToken(
+        string accessToken = _jwtTokenService.GenerateAccessToken(
             user.Id,
             user.Email.Value,
             user.FullName.ToString(),
@@ -145,22 +214,23 @@ public sealed class LoginCommandHandler(
             roles: roles,
             permissions: permissions);
 
-        string rawRefreshToken = jwtTokenService.GenerateRefreshToken();
-        string tokenHash = jwtTokenService.HashToken(rawRefreshToken);
+        string rawRefreshToken = _jwtTokenService.GenerateRefreshToken();
+        string tokenHash = _jwtTokenService.HashToken(rawRefreshToken);
 
+        var utcNow = _dateTimeService?.UtcNow ?? DateTime.UtcNow;
         var refreshToken = RefreshTokenEntity.Create(
             id: Guid.NewGuid(),
             userId: user.Id,
             tokenHash: tokenHash,
             familyId: Guid.NewGuid(), // New family for every fresh login
-            expiresAt: DateTime.UtcNow.AddDays(jwtTokenService.RefreshTokenExpirationDays),
+            expiresAt: utcNow.AddDays(_jwtTokenService.RefreshTokenExpirationDays),
             createdByIp: command.IpAddress);
 
-        await refreshTokenRepository.AddAsync(refreshToken, cancellationToken);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await _refreshTokenRepository.AddAsync(refreshToken, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // ── 6. Audit ─────────────────────────────────────────────────────────
-        await auditService.LogAsync(
+        await _auditService.LogAsync(
             AuditAction.Login,
             isSuccess: true,
             ipAddress: command.IpAddress,
@@ -169,12 +239,12 @@ public sealed class LoginCommandHandler(
             userAgent: command.UserAgent,
             cancellationToken: cancellationToken);
 
-        logger.LogInformation("User {UserId} logged in from {IpAddress}", user.Id, command.IpAddress);
+        LogUserLoggedIn(_logger, user.Id, command.IpAddress);
 
         var response = new LoginResponseDto
         {
             AccessToken = accessToken,
-            ExpiresIn = jwtTokenService.AccessTokenExpirationMinutes * 60,
+            ExpiresIn = _jwtTokenService.AccessTokenExpirationMinutes * 60,
             RefreshToken = rawRefreshToken, // API layer writes this to HttpOnly cookie for browsers
             User = new UserSummaryDto
             {
@@ -186,5 +256,21 @@ public sealed class LoginCommandHandler(
         };
 
         return Result.Success(response);
+    }
+
+    [LoggerMessage(
+        EventId = 1,
+        Level = LogLevel.Information,
+        Message = "User {UserId} logged in from {IpAddress}")]
+    private static partial void LogUserLoggedIn(ILogger logger, Guid userId, string ipAddress);
+
+    private sealed class RolesByIdsWithPermissionsSpecification : BaseSpecification<Role>
+    {
+        public RolesByIdsWithPermissionsSpecification(IEnumerable<Guid> roleIds)
+            : base(r => roleIds.Contains(r.Id))
+        {
+            AddInclude(r => r.RolePermissions);
+            ApplyNoTracking();
+        }
     }
 }

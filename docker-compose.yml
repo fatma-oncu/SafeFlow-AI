@@ -1,0 +1,50 @@
+services:
+  safeflow-sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: safeflow-sqlserver
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${SA_PASSWORD}
+      - MSSQL_PID=${MSSQL_PID}
+    ports:
+      - "1433:1433"
+    volumes:
+      - safeflow-sqldata:/var/opt/mssql
+    networks:
+      - safeflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  safeflow-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: safeflow-api
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=safeflow-sqlserver,1433;Database=SafeFlowDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true
+      - JwtSettings__RsaPrivateKeyPem=${JWT_PRIVATE_KEY}
+      - JwtSettings__RsaPublicKeyPem=${JWT_PUBLIC_KEY}
+    ports:
+      - "5000:8080"
+    depends_on:
+      safeflow-sqlserver:
+        condition: service_healthy
+    networks:
+      - safeflow-network
+
+volumes:
+  safeflow-sqldata:
+    name: safeflow-sqldata
+
+networks:
+  safeflow-network:
+    name: safeflow-network
+    driver: bridge
