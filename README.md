@@ -85,9 +85,31 @@ Before starting the containers or running the Web API:
     http://localhost:5000/swagger
     ```
 
-6.  **Health Endpoint:**
+6.  **Health Endpoints:**
+
+    | Endpoint | Purpose | Docker probe |
+    |---|---|---|
+    | `http://localhost:5000/health` | Aggregate — all checks | — |
+    | `http://localhost:5000/health/live` | Liveness — process alive + memory | ✅ Used by Docker |
+    | `http://localhost:5000/health/ready` | Readiness — process + SQL Server | — |
+
+    Verify Docker container health status after `docker compose up -d`:
+    ```powershell
+    docker inspect safeflow-api --format='{{.State.Health.Status}}'
+    # Expected: healthy
     ```
-    http://localhost:5000/health
+
+    Example healthy JSON response from `/health`:
+    ```json
+    {
+      "status": "Healthy",
+      "totalDuration": "00:00:00.0234567",
+      "entries": {
+        "memory":     { "status": "Healthy", "duration": "00:00:00.0001234", "description": "Memory usage 87.3 MB is within threshold 512 MB." },
+        "self":       { "status": "Healthy", "duration": "00:00:00.0000123", "description": "API process is running." },
+        "sql-server": { "status": "Healthy", "duration": "00:00:00.0233210", "description": null }
+      }
+    }
     ```
 
 ### Local Development (`dotnet run`) — User Secrets
@@ -138,3 +160,67 @@ For detailed specifications, refer to the documentation in the `/docs` folder:
 *   [Domain Bounded Contexts Map](docs/domain-model.md)
 *   [API Resource Contracts Specification](docs/api-specification.md)
 *   [Error Handling & Validation Guidelines](docs/error-handling-strategy.md)
+
+---
+
+## 7. Structured Logging — Serilog & Seq
+
+SafeFlow-AI uses **Serilog** for structured logging with **Seq** as the centralized
+log aggregation and query server. Every log event is enriched with:
+`CorrelationId`, `UserId`, `MachineName`, `Environment`, `ThreadId`, `ProcessId`, and `Application`.
+
+### Starting Seq
+
+Seq starts automatically with `docker compose up -d` alongside SQL Server and the API.
+
+```powershell
+docker compose up -d
+```
+
+### Accessing the Seq Dashboard
+
+| Service      | URL                          |
+|---|---|
+| Seq Dashboard | http://localhost:8081        |
+| Seq Ingest   | http://localhost:5341        |
+| API Swagger  | http://localhost:5000/swagger |
+| Health Check | http://localhost:5000/health  |
+
+No login is required in development mode (Seq runs with anonymous access by default).
+
+### Example Seq Queries
+
+```
+# All errors in the last hour
+@Level = 'Error'
+
+# Trace a specific request end-to-end
+CorrelationId = '3fa85f64-5717-4562-b3fc-2c963f66afa6'
+
+# All requests from a specific user
+UserId = 'abc123'
+
+# Slow HTTP requests (> 1 second)
+Elapsed > 1000 and @MessageTemplate like 'HTTP%'
+
+# Unhandled exceptions only
+@MessageTemplate like 'Unhandled exception%'
+
+# Filter by API version or environment
+Application = 'SafeFlow.API' and Environment = 'Production'
+```
+
+### Local Development (without Docker)
+
+When running with `dotnet run`, Serilog writes to the **Console** and attempts
+to connect to Seq on `http://localhost:5341`. If Seq is not running locally,
+the Console sink continues to function — the Seq sink fails gracefully without
+crashing the application.
+
+To run Seq locally without Docker:
+
+```powershell
+# Using the Seq installer: https://datalust.co/seq
+# Or via Docker alone:
+docker run --rm -e ACCEPT_EULA=Y -p 5341:5341 -p 8081:80 datalust/seq:latest
+```

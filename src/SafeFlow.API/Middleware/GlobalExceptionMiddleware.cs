@@ -1,6 +1,8 @@
+using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using SafeFlow.SharedKernel.Results;
+using Serilog.Context;
 
 namespace SafeFlow.API.Middleware;
 
@@ -32,9 +34,9 @@ public sealed class GlobalExceptionMiddleware
         ILogger<GlobalExceptionMiddleware> logger,
         IHostEnvironment env)
     {
-        _next = next;
-        _logger = logger;
-        _env = env;
+        _next   = next   ?? throw new ArgumentNullException(nameof(next));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _env    = env    ?? throw new ArgumentNullException(nameof(env));
     }
 
     /// <summary>Invokes the middleware.</summary>
@@ -46,10 +48,20 @@ public sealed class GlobalExceptionMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex,
-                "Unhandled exception for {Method} {Path}",
-                context.Request.Method,
-                context.Request.Path);
+            var userId        = context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous";
+            var tenantId      = context.User.FindFirstValue("tenant_id")               ?? "unknown";
+            var correlationId = context.TraceIdentifier;
+            var requestId     = context.TraceIdentifier;
+
+            using (LogContext.PushProperty("UserId",        userId))
+            using (LogContext.PushProperty("TenantId",      tenantId))
+            using (LogContext.PushProperty("CorrelationId", correlationId))
+            using (LogContext.PushProperty("RequestId",     requestId))
+            using (LogContext.PushProperty("RequestMethod", context.Request.Method))
+            using (LogContext.PushProperty("RequestPath",   context.Request.Path.Value ?? string.Empty))
+            {
+                _logger.LogError(ex, "Unhandled exception — StatusCode 500");
+            }
 
             await WriteErrorResponseAsync(context, ex);
         }
@@ -71,7 +83,7 @@ public sealed class GlobalExceptionMiddleware
             Status   = status,
             Title    = title,
             Detail   = detail,
-            Type     = $"https://tools.ietf.org/html/rfc7807#section-{status}",
+            Type     = "https://datatracker.ietf.org/doc/html/rfc7807",
             Instance = context.Request.Path,
             Extensions = { ["errorCode"] = code },
         };

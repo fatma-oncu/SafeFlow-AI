@@ -130,8 +130,19 @@ public static class DependencyInjection
     {
         services
             .AddHealthChecks()
-            .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("API is running."),
-                tags: ["ready", "live"]);
+            // Liveness + Readiness — process is alive and GC is not under critical pressure
+            .AddCheck<HealthChecks.MemoryHealthCheck>(
+                name: "memory",
+                tags: ["live", "ready"])
+            // Self — always healthy when the process can answer; participates in both probes
+            .AddCheck(
+                name: "self",
+                check: () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("API process is running."),
+                tags: ["live", "ready"])
+            // Readiness — validates SQL Server connectivity via EF Core
+            .AddDbContextCheck<SafeFlow.Infrastructure.Persistence.SafeFlowDbContext>(
+                name: "sql-server",
+                tags: ["ready", "infrastructure"]);
 
         return services;
     }

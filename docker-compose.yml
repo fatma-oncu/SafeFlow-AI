@@ -20,6 +20,20 @@ services:
       retries: 10
       start_period: 30s
 
+  safeflow-seq:
+    image: datalust/seq:latest
+    container_name: safeflow-seq
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+    ports:
+      - "5341:5341"   # Serilog ingest (HTTP)
+      - "8081:80"     # Seq web dashboard
+    volumes:
+      - safeflow-seqdata:/data
+    networks:
+      - safeflow-network
+
   safeflow-api:
     build:
       context: .
@@ -32,17 +46,32 @@ services:
       - ConnectionStrings__DefaultConnection=Server=safeflow-sqlserver,1433;Database=SafeFlowDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true
       - JwtSettings__RsaPrivateKeyPem=${JWT_PRIVATE_KEY}
       - JwtSettings__RsaPublicKeyPem=${JWT_PUBLIC_KEY}
+      # Override the Seq serverUrl to target the Seq container, not localhost
+      - Serilog__WriteTo__1__Args__serverUrl=http://safeflow-seq:5341
     ports:
       - "5000:8080"
+    healthcheck:
+      # Uses the .NET health check binary compiled in the Dockerfile build stage.
+      # `dotnet` is already present in mcr.microsoft.com/dotnet/aspnet:9.0 —
+      # no wget, curl, or additional OS packages are installed.
+      test: ["CMD", "dotnet", "/healthcheck/HealthCheck.dll", "http://localhost:8080/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       safeflow-sqlserver:
         condition: service_healthy
+      safeflow-seq:
+        condition: service_started
     networks:
       - safeflow-network
 
 volumes:
   safeflow-sqldata:
     name: safeflow-sqldata
+  safeflow-seqdata:
+    name: safeflow-seqdata
 
 networks:
   safeflow-network:

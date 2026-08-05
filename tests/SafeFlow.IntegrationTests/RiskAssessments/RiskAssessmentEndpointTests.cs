@@ -12,7 +12,8 @@ using Xunit;
 
 namespace SafeFlow.IntegrationTests.RiskAssessments;
 
-public sealed class RiskAssessmentEndpointTests : IClassFixture<SafeFlowWebApplicationFactory>
+[Collection("IntegrationTests")]
+public sealed class RiskAssessmentEndpointTests
 {
     private readonly HttpClient _client;
     private readonly SafeFlowWebApplicationFactory _factory;
